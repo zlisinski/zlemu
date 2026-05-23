@@ -118,6 +118,15 @@ inline void Z80::Push(uint16_t value)
 }
 
 
+inline void Z80::Pop(BytePair dest)
+{
+    dest.l() = memory->ReadByte(reg.sp);
+    reg.sp++;
+    dest.h() = memory->ReadByte(reg.sp);
+    reg.sp++;
+}
+
+
 inline void Z80::SetAFlags()
 {
     // Clear all but carry flag.
@@ -315,6 +324,10 @@ void Z80::ProcessOpcode()
         case 0xD5: Push(reg.DE()); break;
         case 0xE5: Push(index); break;
         case 0xF5: Push(reg.AF()); break;
+        case 0xC1: Pop(reg.BC()); break;
+        case 0xD1: Pop(reg.DE()); break;
+        case 0xE1: Pop(index); break;
+        case 0xF1: Pop(reg.AF()); break;
 
         default: NotYetImplemented(opcode); break;
     }

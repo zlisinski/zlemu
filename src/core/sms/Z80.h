@@ -127,6 +127,7 @@ protected:
     void LoadPointer16(uint16_t destAddr, uint16_t src);
 
     void Push(uint16_t value);
+    void Pop(BytePair dest);
 
     void SetAFlags();
 
