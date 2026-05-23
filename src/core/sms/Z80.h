@@ -109,8 +109,8 @@ protected:
     void ReadImm16();
 
     uint8_t PtrRead8(uint16_t addr);
-    uint8_t PtrReadIndexed8(uint16_t addr, uint8_t index);
     uint16_t PtrRead16(uint16_t addr);
+    uint16_t Indexed(uint16_t addr);
 
     void LoadRegister8(uint8_t &dest, uint8_t src);
     void LoadRegister16(BytePair dest, uint16_t src);

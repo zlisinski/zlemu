@@ -1,9 +1,8 @@
 #include <stdexcept>
 
+#include "../Bytes.h"
 #include "../Utils.h"
 #include "Z80.h"
-
-#include "../Bytes.h"
 
 
 namespace Sms
@@ -63,15 +62,15 @@ inline uint8_t Z80::PtrRead8(uint16_t addr)
 }
 
 
-inline uint8_t Z80::PtrReadIndexed8(uint16_t addr, uint8_t index)
-{
-    return memory->ReadByte(addr + static_cast<int8_t>(index));
-}
-
-
 inline uint16_t Z80::PtrRead16(uint16_t addr)
 {
     return memory->ReadWord(addr);
+}
+
+
+inline uint16_t Z80::Indexed(uint16_t addr)
+{
+    return addr + static_cast<int8_t>(operand[0]);
 }
 
 
@@ -309,31 +308,31 @@ void Z80::ProcessOpcodeDD()
         /// LD Register, (IX+d)
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x46: ReadImm8(); LoadRegister8(reg.b, PtrReadIndexed8(reg.ix, operand[0])); break;
-        case 0x4E: ReadImm8(); LoadRegister8(reg.c, PtrReadIndexed8(reg.ix, operand[0])); break;
-        case 0x56: ReadImm8(); LoadRegister8(reg.d, PtrReadIndexed8(reg.ix, operand[0])); break;
-        case 0x5E: ReadImm8(); LoadRegister8(reg.e, PtrReadIndexed8(reg.ix, operand[0])); break;
-        case 0x66: ReadImm8(); LoadRegister8(reg.h, PtrReadIndexed8(reg.ix, operand[0])); break;
-        case 0x6E: ReadImm8(); LoadRegister8(reg.l, PtrReadIndexed8(reg.ix, operand[0])); break;
-        case 0x7E: ReadImm8(); LoadRegister8(reg.a, PtrReadIndexed8(reg.ix, operand[0])); break;
+        case 0x46: ReadImm8(); LoadRegister8(reg.b, PtrRead8(Indexed(reg.ix))); break;
+        case 0x4E: ReadImm8(); LoadRegister8(reg.c, PtrRead8(Indexed(reg.ix))); break;
+        case 0x56: ReadImm8(); LoadRegister8(reg.d, PtrRead8(Indexed(reg.ix))); break;
+        case 0x5E: ReadImm8(); LoadRegister8(reg.e, PtrRead8(Indexed(reg.ix))); break;
+        case 0x66: ReadImm8(); LoadRegister8(reg.h, PtrRead8(Indexed(reg.ix))); break;
+        case 0x6E: ReadImm8(); LoadRegister8(reg.l, PtrRead8(Indexed(reg.ix))); break;
+        case 0x7E: ReadImm8(); LoadRegister8(reg.a, PtrRead8(Indexed(reg.ix))); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// LD (IX+d), Register
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x70: ReadImm8(); LoadPointer8(reg.ix + static_cast<int8_t>(operand[0]), reg.b); break;
-        case 0x71: ReadImm8(); LoadPointer8(reg.ix + static_cast<int8_t>(operand[0]), reg.c); break;
-        case 0x72: ReadImm8(); LoadPointer8(reg.ix + static_cast<int8_t>(operand[0]), reg.d); break;
-        case 0x73: ReadImm8(); LoadPointer8(reg.ix + static_cast<int8_t>(operand[0]), reg.e); break;
-        case 0x74: ReadImm8(); LoadPointer8(reg.ix + static_cast<int8_t>(operand[0]), reg.h); break;
-        case 0x75: ReadImm8(); LoadPointer8(reg.ix + static_cast<int8_t>(operand[0]), reg.l); break;
-        case 0x77: ReadImm8(); LoadPointer8(reg.ix + static_cast<int8_t>(operand[0]), reg.a); break;
+        case 0x70: ReadImm8(); LoadPointer8(Indexed(reg.ix), reg.b); break;
+        case 0x71: ReadImm8(); LoadPointer8(Indexed(reg.ix), reg.c); break;
+        case 0x72: ReadImm8(); LoadPointer8(Indexed(reg.ix), reg.d); break;
+        case 0x73: ReadImm8(); LoadPointer8(Indexed(reg.ix), reg.e); break;
+        case 0x74: ReadImm8(); LoadPointer8(Indexed(reg.ix), reg.h); break;
+        case 0x75: ReadImm8(); LoadPointer8(Indexed(reg.ix), reg.l); break;
+        case 0x77: ReadImm8(); LoadPointer8(Indexed(reg.ix), reg.a); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// LD (IX+d), Imediate
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x36: ReadImm16(); LoadPointer8(reg.ix + static_cast<int8_t>(operand[0]), operand[1]); break;
+        case 0x36: ReadImm16(); LoadPointer8(Indexed(reg.ix), operand[1]); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// LD Register, Immediate Word
@@ -429,31 +428,31 @@ void Z80::ProcessOpcodeFD()
         /// LD Register, (IX+d)
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x46: ReadImm8(); LoadRegister8(reg.b, PtrReadIndexed8(reg.iy, operand[0])); break;
-        case 0x4E: ReadImm8(); LoadRegister8(reg.c, PtrReadIndexed8(reg.iy, operand[0])); break;
-        case 0x56: ReadImm8(); LoadRegister8(reg.d, PtrReadIndexed8(reg.iy, operand[0])); break;
-        case 0x5E: ReadImm8(); LoadRegister8(reg.e, PtrReadIndexed8(reg.iy, operand[0])); break;
-        case 0x66: ReadImm8(); LoadRegister8(reg.h, PtrReadIndexed8(reg.iy, operand[0])); break;
-        case 0x6E: ReadImm8(); LoadRegister8(reg.l, PtrReadIndexed8(reg.iy, operand[0])); break;
-        case 0x7E: ReadImm8(); LoadRegister8(reg.a, PtrReadIndexed8(reg.iy, operand[0])); break;
+        case 0x46: ReadImm8(); LoadRegister8(reg.b, PtrRead8(Indexed(reg.iy))); break;
+        case 0x4E: ReadImm8(); LoadRegister8(reg.c, PtrRead8(Indexed(reg.iy))); break;
+        case 0x56: ReadImm8(); LoadRegister8(reg.d, PtrRead8(Indexed(reg.iy))); break;
+        case 0x5E: ReadImm8(); LoadRegister8(reg.e, PtrRead8(Indexed(reg.iy))); break;
+        case 0x66: ReadImm8(); LoadRegister8(reg.h, PtrRead8(Indexed(reg.iy))); break;
+        case 0x6E: ReadImm8(); LoadRegister8(reg.l, PtrRead8(Indexed(reg.iy))); break;
+        case 0x7E: ReadImm8(); LoadRegister8(reg.a, PtrRead8(Indexed(reg.iy))); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// LD (IX+d), Register
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x70: ReadImm8(); LoadPointer8(reg.iy + static_cast<int8_t>(operand[0]), reg.b); break;
-        case 0x71: ReadImm8(); LoadPointer8(reg.iy + static_cast<int8_t>(operand[0]), reg.c); break;
-        case 0x72: ReadImm8(); LoadPointer8(reg.iy + static_cast<int8_t>(operand[0]), reg.d); break;
-        case 0x73: ReadImm8(); LoadPointer8(reg.iy + static_cast<int8_t>(operand[0]), reg.e); break;
-        case 0x74: ReadImm8(); LoadPointer8(reg.iy + static_cast<int8_t>(operand[0]), reg.h); break;
-        case 0x75: ReadImm8(); LoadPointer8(reg.iy + static_cast<int8_t>(operand[0]), reg.l); break;
-        case 0x77: ReadImm8(); LoadPointer8(reg.iy + static_cast<int8_t>(operand[0]), reg.a); break;
+        case 0x70: ReadImm8(); LoadPointer8(Indexed(reg.iy), reg.b); break;
+        case 0x71: ReadImm8(); LoadPointer8(Indexed(reg.iy), reg.c); break;
+        case 0x72: ReadImm8(); LoadPointer8(Indexed(reg.iy), reg.d); break;
+        case 0x73: ReadImm8(); LoadPointer8(Indexed(reg.iy), reg.e); break;
+        case 0x74: ReadImm8(); LoadPointer8(Indexed(reg.iy), reg.h); break;
+        case 0x75: ReadImm8(); LoadPointer8(Indexed(reg.iy), reg.l); break;
+        case 0x77: ReadImm8(); LoadPointer8(Indexed(reg.iy), reg.a); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// LD (IX+d), Imediate
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x36: ReadImm16(); LoadPointer8(reg.iy + static_cast<int8_t>(operand[0]), operand[1]); break;
+        case 0x36: ReadImm16(); LoadPointer8(Indexed(reg.iy), operand[1]); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// LD Register, Immediate Word
