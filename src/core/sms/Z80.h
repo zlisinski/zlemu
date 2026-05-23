@@ -23,19 +23,16 @@ enum EFlagMask
     sf = 0x80
 };
 
-
 struct BytePair
 {
-    uint8_t &high;
-    uint8_t &low;
+    uint8_t *high;
+    uint8_t *low;
 
-    constexpr BytePair &operator=(uint16_t value) noexcept
-    {
-        high = Bytes::GetByte<1>(value);
-        low = Bytes::GetByte<0>(value);
-        return *this;
-    }
+    constexpr uint8_t &h() const {return *high;}
+    constexpr uint8_t &l() const {return *low;}
 
+    constexpr BytePair(uint8_t *high, uint8_t *low) noexcept : high(high), low(low) {}
+    constexpr BytePair(const BytePair &value) noexcept : high(value.high), low(value.low) {}
     constexpr BytePair &operator=(const BytePair &value) noexcept
     {
         high = value.high;
@@ -43,9 +40,16 @@ struct BytePair
         return *this;
     }
 
+    constexpr BytePair &operator=(uint16_t value) noexcept
+    {
+        *high = Bytes::GetByte<1>(value);
+        *low = Bytes::GetByte<0>(value);
+        return *this;
+    }
+
     constexpr operator uint16_t() const noexcept
     {
-        return Bytes::Make16Bit(high, low);
+        return Bytes::Make16Bit(*high, *low);
     }
 };
 
@@ -73,19 +77,23 @@ struct Registers
     uint8_t i = 0;
     uint8_t r = 0;
 
-    uint16_t ix = 0;
-    uint16_t iy = 0;
+    uint8_t ixh = 0;
+    uint8_t ixl = 0;
+    uint8_t iyh = 0;
+    uint8_t iyl = 0;
     uint16_t pc = 0;
     uint16_t sp = 0xFFFF;
 
-    constexpr BytePair AF() {return {a, f};}
-    constexpr BytePair BC() {return {b, c};}
-    constexpr BytePair DE() {return {d, e};}
-    constexpr BytePair HL() {return {h, l};}
-    constexpr BytePair AF_() {return {a_, f_};}
-    constexpr BytePair BC_() {return {b_, c_};}
-    constexpr BytePair DE_() {return {d_, e_};}
-    constexpr BytePair HL_() {return {h_, l_};}
+    constexpr BytePair AF() {return {&a, &f};}
+    constexpr BytePair BC() {return {&b, &c};}
+    constexpr BytePair DE() {return {&d, &e};}
+    constexpr BytePair HL() {return {&h, &l};}
+    constexpr BytePair AF_() {return {&a_, &f_};}
+    constexpr BytePair BC_() {return {&b_, &c_};}
+    constexpr BytePair DE_() {return {&d_, &e_};}
+    constexpr BytePair HL_() {return {&h_, &l_};}
+    constexpr BytePair IX() {return {&ixh, &ixl};}
+    constexpr BytePair IY() {return {&iyh, &iyl};}
 };
 
 
@@ -103,7 +111,7 @@ protected:
 
     uint8_t ReadPC8();
     uint16_t ReadPC16();
-    void FetchOpcode();
+    uint8_t FetchOpcode();
 
     void ReadImm8();
     void ReadImm16();
@@ -123,18 +131,22 @@ protected:
     void SetAFlags();
 
     void ProcessOpcodeCB();
-    void ProcessOpcodeDD();
-    void ProcessOpcodeDDCB();
     void ProcessOpcodeED();
-    void ProcessOpcodeFD();
-    void ProcessOpcodeFDCB();
 
     Registers reg;
 
-    uint8_t opcode[3] = {0};
-    uint8_t opcodeCount = 0;
     uint8_t operand[2] = {0};
-    constexpr BytePair OperandWord() {return BytePair{operand[1], operand[0]};}
+    uint8_t operandCount = 0;
+    constexpr BytePair OperandWord() {return BytePair{&operand[1], &operand[0]};}
+
+    enum class IndexPrefix
+    {
+        hl,
+        ix,
+        iy
+    };
+    IndexPrefix prefix = IndexPrefix::hl;
+    BytePair index{&reg.h, &reg.l};
 
     bool iff1 = false;
     bool iff2 = false;
