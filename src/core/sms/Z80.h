@@ -23,77 +23,64 @@ enum EFlagMask
     sf = 0x80
 };
 
-struct BytePair
-{
-    uint8_t *high;
-    uint8_t *low;
-
-    constexpr uint8_t &h() const {return *high;}
-    constexpr uint8_t &l() const {return *low;}
-
-    constexpr BytePair(uint8_t *high, uint8_t *low) noexcept : high(high), low(low) {}
-    constexpr BytePair(const BytePair &value) noexcept : high(value.high), low(value.low) {}
-    constexpr BytePair &operator=(const BytePair &value) noexcept
-    {
-        high = value.high;
-        low = value.low;
-        return *this;
-    }
-
-    constexpr BytePair &operator=(uint16_t value) noexcept
-    {
-        *high = Bytes::GetByte<1>(value);
-        *low = Bytes::GetByte<0>(value);
-        return *this;
-    }
-
-    constexpr operator uint16_t() const noexcept
-    {
-        return Bytes::Make16Bit(*high, *low);
-    }
-};
-
 
 struct Registers
 {
-    uint8_t a = 0xFF;
-    uint8_t f = 0xFF;
-    uint8_t b = 0;
-    uint8_t c = 0;
-    uint8_t d = 0;
-    uint8_t e = 0;
-    uint8_t h = 0;
-    uint8_t l = 0;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#define PAIR(NAME, HIGH, LOW) \
+    union                     \
+    {                         \
+        uint16_t NAME = 0;    \
+        struct                \
+        {                     \
+            uint8_t LOW;      \
+            uint8_t HIGH;     \
+        };\
+    }
 
-    uint8_t a_ = 0xFF;
-    uint8_t f_ = 0xFF;
-    uint8_t b_ = 0;
-    uint8_t c_ = 0;
-    uint8_t d_ = 0;
-    uint8_t e_ = 0;
-    uint8_t h_ = 0;
-    uint8_t l_ = 0;
+    union
+    {
+        uint16_t af = 0xFFFF;
+        struct
+        {
+            union
+            {
+                uint8_t f;
+                struct
+                {
+                    uint8_t c:1; // Carry
+                    uint8_t n:1; // Subtract
+                    uint8_t p:1; // Parity/Overflow
+                    uint8_t x:1; // Undocumented
+                    uint8_t h:1; // Half-carry
+                    uint8_t y:1; // Undocumented
+                    uint8_t z:1; // Zero
+                    uint8_t s:1; // Sign
+                } flags;
+            };
+            uint8_t a;
+        };
+    };
+    PAIR(bc, b, c);
+    PAIR(de, d, e);
+    PAIR(hl, h, l);
+    PAIR(ix, ixh, ixl);
+    PAIR(iy, iyh, iyl);
+
+#undef PAIR
+#pragma GCC diagnostic pop
+
+    uint16_t af_ = 0xFFFF;
+    uint16_t bc_ = 0;
+    uint16_t de_ = 0;
+    uint16_t hl_ = 0;
 
     uint8_t i = 0;
     uint8_t r = 0;
 
-    uint8_t ixh = 0;
-    uint8_t ixl = 0;
-    uint8_t iyh = 0;
-    uint8_t iyl = 0;
     uint16_t pc = 0;
     uint16_t sp = 0xFFFF;
-
-    constexpr BytePair AF() {return {&a, &f};}
-    constexpr BytePair BC() {return {&b, &c};}
-    constexpr BytePair DE() {return {&d, &e};}
-    constexpr BytePair HL() {return {&h, &l};}
-    constexpr BytePair AF_() {return {&a_, &f_};}
-    constexpr BytePair BC_() {return {&b_, &c_};}
-    constexpr BytePair DE_() {return {&d_, &e_};}
-    constexpr BytePair HL_() {return {&h_, &l_};}
-    constexpr BytePair IX() {return {&ixh, &ixl};}
-    constexpr BytePair IY() {return {&iyh, &iyl};}
 };
 
 
@@ -118,16 +105,18 @@ protected:
 
     uint8_t PtrRead8(uint16_t addr);
     uint16_t PtrRead16(uint16_t addr);
-    uint16_t Indexed(uint16_t addr);
+    uint16_t Indexed();
 
     void LoadRegister8(uint8_t &dest, uint8_t src);
-    void LoadRegister16(BytePair dest, uint16_t src);
     void LoadRegister16(uint16_t &dest, uint16_t src);
     void LoadPointer8(uint16_t destAddr, uint8_t src);
     void LoadPointer16(uint16_t destAddr, uint16_t src);
 
     void Push(uint16_t value);
-    void Pop(BytePair dest);
+    void Pop(uint16_t &dest);
+
+    void BlockLoad(bool loop);
+    void BlockCompare(bool loop);
 
     void SetAFlags();
 
@@ -135,19 +124,16 @@ protected:
     void ProcessOpcodeED();
 
     Registers reg;
+    uint16_t *index = &reg.hl;
+    uint8_t *indexH = &reg.h;
+    uint8_t *indexL = &reg.l;
 
-    uint8_t operand[2] = {0};
-    uint8_t operandCount = 0;
-    constexpr BytePair OperandWord() {return BytePair{&operand[1], &operand[0]};}
-
-    enum class IndexPrefix
+    union
     {
-        hl,
-        ix,
-        iy
+        uint8_t operand[2] = {0};
+        uint16_t operandWord;
     };
-    IndexPrefix prefix = IndexPrefix::hl;
-    BytePair index{&reg.h, &reg.l};
+    uint8_t operandCount = 0;
 
     bool iff1 = false;
     bool iff2 = false;

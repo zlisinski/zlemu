@@ -97,12 +97,12 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
         cpu->reg.l = initial["l"].toInt();
         cpu->reg.i = initial["i"].toInt();
         cpu->reg.r = initial["r"].toInt();
-        cpu->reg.AF_() = initial["af_"].toInt();
-        cpu->reg.BC_() = initial["bc_"].toInt();
-        cpu->reg.DE_() = initial["de_"].toInt();
-        cpu->reg.HL_() = initial["hl_"].toInt();
-        cpu->reg.IX() = initial["ix"].toInt();
-        cpu->reg.IY() = initial["iy"].toInt();
+        cpu->reg.af_ = initial["af_"].toInt();
+        cpu->reg.bc_ = initial["bc_"].toInt();
+        cpu->reg.de_ = initial["de_"].toInt();
+        cpu->reg.hl_ = initial["hl_"].toInt();
+        cpu->reg.ix = initial["ix"].toInt();
+        cpu->reg.iy = initial["iy"].toInt();
         cpu->reg.pc = initial["pc"].toInt();
         cpu->reg.sp = initial["sp"].toInt();
         //cpu->reg.wz = initial["wz"].toInt();
@@ -142,12 +142,12 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
         EXPECT_EQ(cpu->reg.l, final["l"].toInt()) << testName;
         EXPECT_EQ(cpu->reg.i, final["i"].toInt()) << testName;
         EXPECT_EQ(cpu->reg.r, final["r"].toInt()) << testName;
-        EXPECT_EQ(cpu->reg.AF_(), final["af_"].toInt()) << testName;
-        EXPECT_EQ(cpu->reg.BC_(), final["bc_"].toInt()) << testName;
-        EXPECT_EQ(cpu->reg.DE_(), final["de_"].toInt()) << testName;
-        EXPECT_EQ(cpu->reg.HL_(), final["hl_"].toInt()) << testName;
-        EXPECT_EQ(cpu->reg.IX(), final["ix"].toInt()) << testName;
-        EXPECT_EQ(cpu->reg.IY(), final["iy"].toInt()) << testName;
+        EXPECT_EQ(cpu->reg.af_, final["af_"].toInt()) << testName;
+        EXPECT_EQ(cpu->reg.bc_, final["bc_"].toInt()) << testName;
+        EXPECT_EQ(cpu->reg.de_, final["de_"].toInt()) << testName;
+        EXPECT_EQ(cpu->reg.hl_, final["hl_"].toInt()) << testName;
+        EXPECT_EQ(cpu->reg.ix, final["ix"].toInt()) << testName;
+        EXPECT_EQ(cpu->reg.iy, final["iy"].toInt()) << testName;
         EXPECT_EQ(cpu->reg.pc, final["pc"].toInt()) << testName;
         EXPECT_EQ(cpu->reg.sp, final["sp"].toInt()) << testName;
         //EXPECT_EQ(cpu->reg.wz, final["wz"].toInt()) << testName;
@@ -197,7 +197,7 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\td: 0x%1\n").arg(initial["d"].toInt(), 2, 16, QChar('0'));
     str += QStringLiteral("\te: 0x%1\n").arg(initial["e"].toInt(), 2, 16, QChar('0'));
     uint8_t f = initial["f"].toInt();
-    str += QStringLiteral("\tf: 0x%1 (s=%2 z=%3 x=%4 h=%5 y=%6 p/v=%7 n=%8 c=%9)\n")
+    str += QStringLiteral("\tf: 0x%1 (s=%2 z=%3 y=%4 h=%5 x=%6 p/v=%7 n=%8 c=%9)\n")
         .arg(f, 2, 16, QChar('0'))
         .arg(f >> 7)
         .arg((f >> 6) & 0x01)
@@ -246,7 +246,7 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\td: 0x%1\n").arg(final["d"].toInt(), 2, 16, QChar('0'));
     str += QStringLiteral("\te: 0x%1\n").arg(final["e"].toInt(), 2, 16, QChar('0'));
     f = final["f"].toInt();
-    str += QStringLiteral("\tf: 0x%1 (s=%2 z=%3 x=%4 h=%5 y=%6 p/v=%7 n=%8 c=%9)\n")
+    str += QStringLiteral("\tf: 0x%1 (s=%2 z=%3 y=%4 h=%5 x=%6 p/v=%7 n=%8 c=%9)\n")
         .arg(f, 2, 16, QChar('0'))
         .arg(f >> 7)
         .arg((f >> 6) & 0x01)
@@ -294,7 +294,7 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\td: 0x%1\n").arg(cpu->reg.d, 2, 16, QChar('0'));
     str += QStringLiteral("\te: 0x%1\n").arg(cpu->reg.e, 2, 16, QChar('0'));
     f = cpu->reg.f;
-    str += QStringLiteral("\tp: 0x%1 (s=%2 z=%3 x=%4 h=%5 y=%6 p/v=%7 n=%8 c=%9)\n")
+    str += QStringLiteral("\tp: 0x%1 (s=%2 z=%3 y=%4 h=%5 x=%6 p/v=%7 n=%8 c=%9)\n")
         .arg(f, 2, 16, QChar('0'))
         .arg(f >> 7)
         .arg((f >> 6) & 0x01)
@@ -308,12 +308,12 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\tl: 0x%1\n").arg(cpu->reg.l, 2, 16, QChar('0'));
     str += QStringLiteral("\ti: 0x%1\n").arg(cpu->reg.i, 2, 16, QChar('0'));
     str += QStringLiteral("\tr: 0x%1\n").arg(cpu->reg.r, 2, 16, QChar('0'));
-    str += QStringLiteral("\taf_: 0x%1\n").arg(cpu->reg.AF_(), 4, 16, QChar('0'));
-    str += QStringLiteral("\tbc_: 0x%1\n").arg(cpu->reg.BC_(), 4, 16, QChar('0'));
-    str += QStringLiteral("\tde_: 0x%1\n").arg(cpu->reg.DE_(), 4, 16, QChar('0'));
-    str += QStringLiteral("\thl_: 0x%1\n").arg(cpu->reg.HL_(), 4, 16, QChar('0'));
-    str += QStringLiteral("\tix: 0x%1\n").arg(cpu->reg.IX(), 4, 16, QChar('0'));
-    str += QStringLiteral("\tiy: 0x%1\n").arg(cpu->reg.IY(), 4, 16, QChar('0'));
+    str += QStringLiteral("\taf_: 0x%1\n").arg(cpu->reg.af_, 4, 16, QChar('0'));
+    str += QStringLiteral("\tbc_: 0x%1\n").arg(cpu->reg.bc_, 4, 16, QChar('0'));
+    str += QStringLiteral("\tde_: 0x%1\n").arg(cpu->reg.de_, 4, 16, QChar('0'));
+    str += QStringLiteral("\thl_: 0x%1\n").arg(cpu->reg.hl_, 4, 16, QChar('0'));
+    str += QStringLiteral("\tix: 0x%1\n").arg(cpu->reg.ix, 4, 16, QChar('0'));
+    str += QStringLiteral("\tiy: 0x%1\n").arg(cpu->reg.iy, 4, 16, QChar('0'));
     str += QStringLiteral("\tpc: 0x%1\n").arg(cpu->reg.pc, 4, 16, QChar('0'));
     str += QStringLiteral("\tsp: 0x%1\n").arg(cpu->reg.sp, 4, 16, QChar('0'));
     //str += QStringLiteral("\twz: 0x%1\n").arg(cpu->reg.wz, 4, 16, QChar('0'));
@@ -352,6 +352,7 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x77, 0x02, 0x12,  0x32,
         0x36, 0x3A, 0x01, 0x11, 0x21, 0x31, 0x2A, 0x22,
         0xC5, 0xD5, 0xE5, 0xF5, 0xC1, 0xD1, 0xE1, 0xF1,
+        0xEB, 0x08, 0xD9, 0xE3,
     };
     for (uint8_t i : implemented)
         info.push_back(TestOpcodeTable[i]);
@@ -363,7 +364,8 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         info.push_back(TestOpcodeTableCB[i]);*/
 
     uint8_t implementedED[] = {
-        0x47, 0x4F, 0x57, 0x5F, 0x4B, 0x5B, 0x6B, 0x7B, 0x43, 0x53, 0x63, 0x73
+        0x47, 0x4F, 0x57, 0x5F, 0x4B, 0x5B, 0x6B, 0x7B, 0x43, 0x53, 0x63, 0x73,
+        0xA0, 0xB0, 0xA8, 0xB8, 0xA1, 0xB1, 0xA9, 0xB9
     };
     for (uint8_t i : implementedED)
         info.push_back(TestOpcodeTableED[i]);
@@ -379,6 +381,7 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x77, 0x02, 0x12,  0x32,
         0x36, 0x3A, 0x01, 0x11, 0x21, 0x31, 0x2A, 0x22,
         0xC5, 0xD5, 0xE5, 0xF5, 0xC1, 0xD1, 0xE1, 0xF1,
+        0xEB, 0x08, 0xD9, 0xE3
     };
     for (uint8_t i : implementedDD)
         info.push_back(TestOpcodeTableDD[i]);
@@ -400,6 +403,7 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x77, 0x02, 0x12,  0x32,
         0x36, 0x3A, 0x01, 0x11, 0x21, 0x31, 0x2A, 0x22,
         0xC5, 0xD5, 0xE5, 0xF5, 0xC1, 0xD1, 0xE1, 0xF1,
+        0xEB, 0x08, 0xD9, 0xE3
     };
     for (uint8_t i : implementedFD)
         info.push_back(TestOpcodeTableFD[i]);
