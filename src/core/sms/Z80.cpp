@@ -79,6 +79,47 @@ inline uint16_t Z80::Indexed()
 }
 
 
+inline void Z80::SetXYFlags(uint8_t value)
+{
+    reg.flags.x = Bytes::TestBit<3>(value);
+    reg.flags.y = Bytes::TestBit<5>(value);
+}
+
+
+template <typename T>
+inline void Z80::SetZSFlags(T value)
+{
+    reg.flags.z = value == 0;
+    reg.flags.s = Bytes::TestBit<(sizeof(T) * 8) - 1>(value);
+}
+
+
+inline void Z80::SetIRFlags()
+{
+    reg.flags.n = 0;
+    reg.flags.p = iff2;
+    reg.flags.h = 0;
+    SetXYFlags(reg.a);
+    SetZSFlags(reg.a);
+}
+
+
+inline bool Z80::GetParity(uint8_t value) const
+{
+    value ^= value >> 4;
+    value ^= value >> 2;
+    value ^= value >> 1;
+    return !(value & 1);
+}
+
+
+template <typename T>
+inline bool Z80::HalfCarry(T op1, T op2, int result) const
+{
+    return (op1 ^ op2 ^ result) & (0x10 << (sizeof(T) - 1) * 8);
+}
+
+
 inline void Z80::LoadRegister8(uint8_t &dest, uint8_t src)
 {
     dest = src;
@@ -138,46 +179,231 @@ inline void Z80::BlockLoad(bool loop)
     if (reg.bc && loop)
     {
         reg.pc -= 2;
-        reg.flags.x = Bytes::TestBit<11>(reg.pc);
-        reg.flags.y = Bytes::TestBit<13>(reg.pc);
+        SetXYFlags(reg.pc >> 8);
     }
 }
 
 
 inline void Z80::BlockCompare(bool loop)
 {
-    uint8_t byte = reg.a - memory->ReadWord(reg.hl);
+    uint8_t byte = memory->ReadByte(reg.hl);
+    uint8_t result = reg.a - byte;
 
     reg.bc--;
 
     reg.flags.n = 1;
     reg.flags.p = reg.bc != 0;
-    reg.flags.h = (reg.a & 0x0F) < (byte & 0x0F);
-    reg.flags.x = Bytes::TestBit<3>(byte - reg.flags.h);
-    reg.flags.y = Bytes::TestBit<1>(byte - reg.flags.h);
-    reg.flags.z = byte == 0;
-    reg.flags.s = Bytes::TestBit<7>(byte);
+    reg.flags.h = HalfCarry(reg.a, byte, result);
+    reg.flags.x = Bytes::TestBit<3>(result - reg.flags.h);
+    reg.flags.y = Bytes::TestBit<1>(result - reg.flags.h);
+    SetZSFlags(result);
 
     if (reg.bc && !reg.flags.z && loop)
     {
         reg.pc -= 2;
-        reg.flags.x = Bytes::TestBit<11>(reg.pc);
-        reg.flags.y = Bytes::TestBit<13>(reg.pc);
+        SetXYFlags(reg.pc >> 8);
     }
 }
 
 
-inline void Z80::SetAFlags()
+inline void Z80::Add8(uint8_t value, bool carry)
 {
-    // Clear all but carry flag.
-    reg.f &= cf;
+    uint16_t result = reg.a + value + carry;
 
-    if (reg.a == 0)
-        reg.f |= zf;
-    else
-        reg.f |= (reg.a & (sf | yf | xf)); // Sign flag, x flag, and y flag get copied over from the a register.
+    reg.flags.c = result > 0xFF;
+    reg.flags.n = 0;
+    reg.flags.p = Bytes::TestBit<7>((reg.a ^ result) & ~(reg.a ^ value));
+    reg.flags.h = HalfCarry(reg.a, value, result);
+    SetXYFlags(result);
+    SetZSFlags((uint8_t)result);
 
-    reg.f |= (iff2 ? pf : 0);
+    reg.a = result;
+}
+
+
+inline void Z80::Add16(uint16_t &dest, uint16_t value)
+{
+    int32_t result = dest + value;
+
+    reg.flags.c = result > 0xFFFF;
+    reg.flags.n = 0;
+    reg.flags.h = HalfCarry(dest, value, result);
+    SetXYFlags(result >> 8);
+
+    dest = result;
+}
+
+
+inline void Z80::Adc16(uint16_t &dest, uint16_t value)
+{
+    int32_t result = dest + value + reg.flags.c;
+
+    reg.flags.c = result > 0xFFFF;
+    reg.flags.n = 0;
+    reg.flags.p = Bytes::TestBit<15>((dest ^ result) & ~(dest ^ value));
+    reg.flags.h = HalfCarry(dest, value, result);
+    SetXYFlags(result >> 8);
+    SetZSFlags((uint16_t)result);
+
+    dest = result;
+}
+
+
+inline void Z80::Sub8(uint8_t value, bool carry)
+{
+    int16_t result = reg.a - value - carry;
+
+    reg.flags.c = result < 0;
+    reg.flags.n = 1;
+    reg.flags.p = Bytes::TestBit<7>((reg.a ^ result) & (reg.a ^ value));
+    reg.flags.h = HalfCarry(reg.a, value, result);
+    SetXYFlags(result);
+    SetZSFlags((uint8_t)result);
+
+    reg.a = Bytes::GetByte<0>(result);
+}
+
+
+void Z80::Sbc16(uint16_t &dest, uint16_t value)
+{
+    int32_t result = dest - value - reg.flags.c;
+
+    reg.flags.c = result < 0;
+    reg.flags.n = 1;
+    reg.flags.p = Bytes::TestBit<15>((dest ^ result) & (dest ^ value));
+    reg.flags.h = HalfCarry(dest, value, result);
+    SetXYFlags(result >> 8);
+    SetZSFlags((uint16_t)result);
+
+    dest = result;
+}
+
+
+inline void Z80::Inc8(uint8_t &dest)
+{
+    uint8_t result = dest + 1;
+
+    reg.flags.n = 0;
+    reg.flags.p = dest == 0x7F;
+    reg.flags.h = HalfCarry(dest, (uint8_t)1, result);
+    SetXYFlags(result);
+    SetZSFlags(result);
+
+    dest = result;
+}
+
+
+inline void Z80::IncPtr8(uint16_t destAddr)
+{
+    uint8_t src = PtrRead8(destAddr);
+    uint8_t result = src + 1;
+
+    reg.flags.n = 0;
+    reg.flags.p = src == 0x7F;
+    reg.flags.h = HalfCarry(src, (uint8_t)1, result);
+    SetXYFlags(result);
+    SetZSFlags(result);
+
+    memory->WriteByte(destAddr, result);
+}
+
+
+inline void Z80::Inc16(uint16_t &dest)
+{
+    dest++;
+}
+
+
+inline void Z80::Dec8(uint8_t &dest)
+{
+    uint8_t result = dest - 1;
+
+    reg.flags.n = 1;
+    reg.flags.p = dest == 0x80;
+    reg.flags.h = HalfCarry(dest, (uint8_t)1, result);
+    SetXYFlags(result);
+    SetZSFlags(result);
+
+    dest = result;
+}
+
+
+inline void Z80::DecPtr8(uint16_t destAddr)
+{
+    uint8_t src = PtrRead8(destAddr);
+    uint8_t result = src - 1;
+
+    reg.flags.n = 1;
+    reg.flags.p = src == 0x80;
+    reg.flags.h = HalfCarry(src, (uint8_t)1, result);
+    SetXYFlags(result);
+    SetZSFlags(result);
+
+    memory->WriteByte(destAddr, result);
+}
+
+
+inline void Z80::Dec16(uint16_t &dest)
+{
+    dest--;
+}
+
+
+inline void Z80::And(uint8_t value)
+{
+    uint8_t result = reg.a & value;
+
+    reg.flags.c = 0;
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(result);
+    reg.flags.h = 1;
+    SetXYFlags(result);
+    SetZSFlags(result);
+
+    reg.a  = result;
+}
+
+
+inline void Z80::Or(uint8_t value)
+{
+    uint8_t result = reg.a | value;
+
+    reg.flags.c = 0;
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(result);
+    reg.flags.h = 0;
+    SetXYFlags(result);
+    SetZSFlags(result);
+
+    reg.a  = result;
+}
+
+
+inline void Z80::Xor(uint8_t value)
+{
+    uint8_t result = reg.a ^ value;
+
+    reg.flags.c = 0;
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(result);
+    reg.flags.h = 0;
+    SetXYFlags(result);
+    SetZSFlags(result);
+
+    reg.a  = result;
+}
+
+
+inline void Z80::Cp(uint8_t value)
+{
+    int16_t result = reg.a - value;
+
+    reg.flags.c = result < 0;
+    reg.flags.n = 1;
+    reg.flags.p = Bytes::TestBit<7>((reg.a ^ result) & (reg.a ^ value));
+    reg.flags.h = HalfCarry(reg.a, value, result);
+    SetXYFlags(value);
+    SetZSFlags((uint8_t)result);
 }
 
 
@@ -392,6 +618,123 @@ void Z80::ProcessOpcode()
             break;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Arithmetic
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0x80: Add8(reg.b); break;
+        case 0x81: Add8(reg.c); break;
+        case 0x82: Add8(reg.d); break;
+        case 0x83: Add8(reg.e); break;
+        case 0x84: Add8(*indexH); break;
+        case 0x85: Add8(*indexL); break;
+        case 0x86: Add8(PtrRead8(Indexed())); break;
+        case 0x87: Add8(reg.a); break;
+        case 0xC6: ReadImm8(); Add8(operand[0]); break;
+        case 0x09: Add16(*index, reg.bc); break;
+        case 0x19: Add16(*index, reg.de); break;
+        case 0x29: Add16(*index, *index); break;
+        case 0x39: Add16(*index, reg.sp); break;
+
+        case 0x88: Add8(reg.b, reg.flags.c); break;
+        case 0x89: Add8(reg.c, reg.flags.c); break;
+        case 0x8A: Add8(reg.d, reg.flags.c); break;
+        case 0x8B: Add8(reg.e, reg.flags.c); break;
+        case 0x8C: Add8(*indexH, reg.flags.c); break;
+        case 0x8D: Add8(*indexL, reg.flags.c); break;
+        case 0x8E: Add8(PtrRead8(Indexed()), reg.flags.c); break;
+        case 0x8F: Add8(reg.a, reg.flags.c); break;
+        case 0xCE: ReadImm8(); Add8(operand[0], reg.flags.c); break;
+
+        case 0x90: Sub8(reg.b); break;
+        case 0x91: Sub8(reg.c); break;
+        case 0x92: Sub8(reg.d); break;
+        case 0x93: Sub8(reg.e); break;
+        case 0x94: Sub8(*indexH); break;
+        case 0x95: Sub8(*indexL); break;
+        case 0x96: Sub8(PtrRead8(Indexed())); break;
+        case 0x97: Sub8(reg.a); break;
+        case 0xD6: ReadImm8(); Sub8(operand[0]); break;
+
+        case 0x98: Sub8(reg.b, reg.flags.c); break;
+        case 0x99: Sub8(reg.c, reg.flags.c); break;
+        case 0x9A: Sub8(reg.d, reg.flags.c); break;
+        case 0x9B: Sub8(reg.e, reg.flags.c); break;
+        case 0x9C: Sub8(*indexH, reg.flags.c); break;
+        case 0x9D: Sub8(*indexL, reg.flags.c); break;
+        case 0x9E: Sub8(PtrRead8(Indexed()), reg.flags.c); break;
+        case 0x9F: Sub8(reg.a, reg.flags.c); break;
+        case 0xDE: ReadImm8(); Sub8(operand[0], reg.flags.c); break;
+
+        case 0x04: Inc8(reg.b); break;
+        case 0x0C: Inc8(reg.c); break;
+        case 0x14: Inc8(reg.d); break;
+        case 0x1C: Inc8(reg.e); break;
+        case 0x24: Inc8(*indexH); break;
+        case 0x2C: Inc8(*indexL); break;
+        case 0x34: IncPtr8(Indexed()); break;
+        case 0x3C: Inc8(reg.a); break;
+        case 0x03: Inc16(reg.bc); break;
+        case 0x13: Inc16(reg.de); break;
+        case 0x23: Inc16(*index); break;
+        case 0x33: Inc16(reg.sp); break;
+
+        case 0x05: Dec8(reg.b); break;
+        case 0x0D: Dec8(reg.c); break;
+        case 0x15: Dec8(reg.d); break;
+        case 0x1D: Dec8(reg.e); break;
+        case 0x25: Dec8(*indexH); break;
+        case 0x2D: Dec8(*indexL); break;
+        case 0x35: DecPtr8(Indexed()); break;
+        case 0x3D: Dec8(reg.a); break;
+        case 0x0B: Dec16(reg.bc); break;
+        case 0x1B: Dec16(reg.de); break;
+        case 0x2B: Dec16(*index); break;
+        case 0x3B: Dec16(reg.sp); break;
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Logic
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0xA0: And(reg.b); break;
+        case 0xA1: And(reg.c); break;
+        case 0xA2: And(reg.d); break;
+        case 0xA3: And(reg.e); break;
+        case 0xA4: And(*indexH); break;
+        case 0xA5: And(*indexL); break;
+        case 0xA6: And(PtrRead8(Indexed())); break;
+        case 0xA7: And(reg.a); break;
+        case 0xE6: ReadImm8(); And(operand[0]); break;
+
+        case 0xB0: Or(reg.b); break;
+        case 0xB1: Or(reg.c); break;
+        case 0xB2: Or(reg.d); break;
+        case 0xB3: Or(reg.e); break;
+        case 0xB4: Or(*indexH); break;
+        case 0xB5: Or(*indexL); break;
+        case 0xB6: Or(PtrRead8(Indexed())); break;
+        case 0xB7: Or(reg.a); break;
+        case 0xF6: ReadImm8(); Or(operand[0]); break;
+
+        case 0xA8: Xor(reg.b); break;
+        case 0xA9: Xor(reg.c); break;
+        case 0xAA: Xor(reg.d); break;
+        case 0xAB: Xor(reg.e); break;
+        case 0xAC: Xor(*indexH); break;
+        case 0xAD: Xor(*indexL); break;
+        case 0xAE: Xor(PtrRead8(Indexed())); break;
+        case 0xAF: Xor(reg.a); break;
+        case 0xEE: ReadImm8(); Xor(operand[0]); break;
+
+        case 0xB8: Cp(reg.b); break;
+        case 0xB9: Cp(reg.c); break;
+        case 0xBA: Cp(reg.d); break;
+        case 0xBB: Cp(reg.e); break;
+        case 0xBC: Cp(*indexH); break;
+        case 0xBD: Cp(*indexL); break;
+        case 0xBE: Cp(PtrRead8(Indexed())); break;
+        case 0xBF: Cp(reg.a); break;
+
         default: NotYetImplemented(opcode); break;
     }
 }
@@ -420,8 +763,8 @@ void Z80::ProcessOpcodeED()
 
         case 0x47: LoadRegister8(reg.i, reg.a); break;
         case 0x4F: LoadRegister8(reg.r, reg.a); break;
-        case 0x57: LoadRegister8(reg.a, reg.i); SetAFlags(); break;
-        case 0x5F: LoadRegister8(reg.a, reg.r); SetAFlags(); break;
+        case 0x57: LoadRegister8(reg.a, reg.i); SetIRFlags(); break;
+        case 0x5F: LoadRegister8(reg.a, reg.r); SetIRFlags(); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// LD Register Pair, Immediate Pointer
@@ -454,6 +797,19 @@ void Z80::ProcessOpcodeED()
         case 0xA9: BlockCompare(false); reg.hl--; break;
         case 0xB9: BlockCompare(true); reg.hl--; break;
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Arithmetic
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0x4A: Adc16(reg.hl, reg.bc); break;
+        case 0x5A: Adc16(reg.hl, reg.de); break;
+        case 0x6A: Adc16(reg.hl, reg.hl); break;
+        case 0x7A: Adc16(reg.hl, reg.sp); break;
+
+        case 0x42: Sbc16(reg.hl, reg.bc); break;
+        case 0x52: Sbc16(reg.hl, reg.de); break;
+        case 0x62: Sbc16(reg.hl, reg.hl); break;
+        case 0x72: Sbc16(reg.hl, reg.sp); break;
 
         default: NotYetImplemented(opcode); break;
     }

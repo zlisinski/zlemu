@@ -12,15 +12,15 @@ namespace Sms
 
 enum EFlagMask
 {
-    cf = 0x01,
-    nf = 0x02,
-    pf = 0x04,
-    vf = 0x04,
-    xf = 0x08,
-    hf = 0x10,
-    yf = 0x20,
-    zf = 0x40,
-    sf = 0x80
+    CF = 0x01,
+    NF = 0x02,
+    PF = 0x04,
+    VF = 0x04,
+    XF = 0x08,
+    HF = 0x10,
+    YF = 0x20,
+    ZF = 0x40,
+    SF = 0x80
 };
 
 
@@ -107,6 +107,14 @@ protected:
     uint16_t PtrRead16(uint16_t addr);
     uint16_t Indexed();
 
+    void SetXYFlags(uint8_t value);
+    template <typename T>
+    void SetZSFlags(T value);
+    void SetIRFlags();
+    bool GetParity(uint8_t value) const;
+    template <typename T>
+    bool HalfCarry(T op1, T op2, int result) const;
+
     void LoadRegister8(uint8_t &dest, uint8_t src);
     void LoadRegister16(uint16_t &dest, uint16_t src);
     void LoadPointer8(uint16_t destAddr, uint8_t src);
@@ -118,7 +126,22 @@ protected:
     void BlockLoad(bool loop);
     void BlockCompare(bool loop);
 
-    void SetAFlags();
+    void Add8(uint8_t value, bool carry = false);
+    void Add16(uint16_t &dest, uint16_t value);
+    void Adc16(uint16_t &dest, uint16_t value);
+    void Sub8(uint8_t value, bool carry = false);
+    void Sbc16(uint16_t &dest, uint16_t value);
+    void Inc8(uint8_t &dest);
+    void IncPtr8(uint16_t destAddr);
+    void Inc16(uint16_t &dest);
+    void Dec8(uint8_t &dest);
+    void DecPtr8(uint16_t destAddr);
+    void Dec16(uint16_t &dest);
+
+    void And(uint8_t value);
+    void Or(uint8_t value);
+    void Xor(uint8_t value);
+    void Cp(uint8_t value);
 
     void ProcessOpcodeCB();
     void ProcessOpcodeED();
