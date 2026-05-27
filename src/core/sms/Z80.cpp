@@ -69,13 +69,43 @@ inline uint16_t Z80::PtrRead16(uint16_t addr)
 }
 
 
+template <bool PrefixedCB>
 inline uint16_t Z80::Indexed()
 {
     if (index == &reg.hl)
         return *index;
 
-    ReadImm8();
+    // Prefixed CB instructions already read the displacement.
+    if constexpr (!PrefixedCB)
+        ReadImm8();
+
     return *index + static_cast<int8_t>(operand[0]);
+}
+
+
+template <uint8_t (Z80::*func)(uint8_t), bool PrefixedCB>
+inline void Z80::ValWrapper(uint8_t &r)
+{
+    if constexpr (PrefixedCB)
+    {
+        uint16_t addr = Indexed<PrefixedCB>();
+        r = PtrRead8(addr);
+        r = (this->*func)(r);
+        LoadPointer8(addr, r);
+    }
+    else
+    {
+        r = (this->*func)(r);
+    }
+}
+
+
+template <uint8_t (Z80::*func)(uint8_t)>
+inline void Z80::PtrWrapper(uint16_t addr)
+{
+    uint8_t value = PtrRead8(addr);
+    value = (this->*func)(value);
+    LoadPointer8(addr, value);
 }
 
 
@@ -407,6 +437,174 @@ inline void Z80::Cp(uint8_t value)
 }
 
 
+inline void Z80::RlcA()
+{
+    reg.flags.c = Bytes::TestBit<7>(reg.a);
+    reg.a = (reg.a << 1) | reg.flags.c;
+
+    reg.flags.n = 0;
+    reg.flags.h = 0;
+    SetXYFlags(reg.a);
+}
+
+
+inline void Z80::RlA()
+{
+    uint8_t oldCarry = reg.flags.c;
+    reg.flags.c = Bytes::TestBit<7>(reg.a);
+    reg.a = (reg.a << 1) | oldCarry;
+
+    reg.flags.n = 0;
+    reg.flags.h = 0;
+    SetXYFlags(reg.a);
+}
+
+
+inline uint8_t Z80::Rlc(uint8_t value)
+{
+    reg.flags.c = Bytes::TestBit<7>(value);
+    value = (value << 1) | reg.flags.c;
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(value);
+    reg.flags.h = 0;
+    SetXYFlags(value);
+    SetZSFlags(value);
+
+    return value;
+}
+
+
+inline uint8_t Z80::Rl(uint8_t value)
+{
+    uint8_t oldCarry = reg.flags.c;
+    reg.flags.c = Bytes::TestBit<7>(value);
+    value = (value << 1) | oldCarry;
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(value);
+    reg.flags.h = 0;
+    SetXYFlags(value);
+    SetZSFlags(value);
+
+    return value;
+}
+
+
+inline uint8_t Z80::Sla(uint8_t value)
+{
+    reg.flags.c = Bytes::TestBit<7>(value);
+    value <<= 1;
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(value);
+    reg.flags.h = 0;
+    SetXYFlags(value);
+    SetZSFlags(value);
+
+    return value;
+}
+
+
+inline uint8_t Z80::Sll(uint8_t value)
+{
+    reg.flags.c = Bytes::TestBit<7>(value);
+    value = (value << 1) | 0x01;
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(value);
+    reg.flags.h = 0;
+    SetXYFlags(value);
+    SetZSFlags(value);
+
+    return value;
+}
+
+
+inline void Z80::RrcA()
+{
+    reg.flags.c = Bytes::TestBit<0>(reg.a);
+    reg.a = (reg.a >> 1) | (reg.flags.c << 7);
+
+    reg.flags.n = 0;
+    reg.flags.h = 0;
+    SetXYFlags(reg.a);
+}
+
+
+inline void Z80::RrA()
+{
+    uint8_t oldCarry = reg.flags.c;
+    reg.flags.c = Bytes::TestBit<0>(reg.a);
+    reg.a = (reg.a >> 1) | (oldCarry << 7);
+
+    reg.flags.n = 0;
+    reg.flags.h = 0;
+    SetXYFlags(reg.a);
+}
+
+
+inline uint8_t Z80::Rrc(uint8_t value)
+{
+    reg.flags.c = Bytes::TestBit<0>(value);
+    value = value >> 1 | (reg.flags.c << 7);
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(value);
+    reg.flags.h = 0;
+    SetXYFlags(value);
+    SetZSFlags(value);
+
+    return value;
+}
+
+
+inline uint8_t Z80::Rr(uint8_t value)
+{
+    uint8_t oldCarry = reg.flags.c;
+    reg.flags.c = Bytes::TestBit<0>(value);
+    value = (value >> 1) | (oldCarry << 7);
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(value);
+    reg.flags.h = 0;
+    SetXYFlags(value);
+    SetZSFlags(value);
+
+    return value;
+}
+
+
+uint8_t Z80::Sra(uint8_t value)
+{
+    reg.flags.c = Bytes::TestBit<0>(value);
+    value = static_cast<int8_t>(value) >> 1;
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(value);
+    reg.flags.h = 0;
+    SetXYFlags(value);
+    SetZSFlags(value);
+
+    return value;
+}
+
+
+uint8_t Z80::Srl(uint8_t value)
+{
+    reg.flags.c = Bytes::TestBit<0>(value);
+    value >>= 1;
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(value);
+    reg.flags.h = 0;
+    SetXYFlags(value);
+    SetZSFlags(value);
+
+    return value;
+}
+
+
 void Z80::ProcessOpcode()
 {
     uint8_t opcode = FetchOpcode();
@@ -436,7 +634,11 @@ void Z80::ProcessOpcode()
 
     if (opcode == 0xCB)
     {
-        ProcessOpcodeCB();
+        if (index != &reg.hl)
+            ProcessOpcodeCB<true>();
+        else
+            ProcessOpcodeCB<false>();
+
         return;
     }
     if (opcode == 0xED)
@@ -735,19 +937,17 @@ void Z80::ProcessOpcode()
         case 0xBE: Cp(PtrRead8(Indexed())); break;
         case 0xBF: Cp(reg.a); break;
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Rotate & Shift
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0x07: RlcA(); break;
+        case 0x17: RlA(); break;
+        case 0x0F: RrcA(); break;
+        case 0x1F: RrA(); break;
+
         default: NotYetImplemented(opcode); break;
     }
-}
-
-
-void Z80::ProcessOpcodeCB()
-{
-    /*uint8_t opcode = FetchOpcode();
-
-    switch (opcode)
-    {
-        default: NotYetImplemented(opcode); break;
-    }*/
 }
 
 
@@ -810,6 +1010,103 @@ void Z80::ProcessOpcodeED()
         case 0x52: Sbc16(reg.hl, reg.de); break;
         case 0x62: Sbc16(reg.hl, reg.hl); break;
         case 0x72: Sbc16(reg.hl, reg.sp); break;
+
+        default: NotYetImplemented(opcode); break;
+    }
+}
+
+
+template <bool Prefixed>
+void Z80::ProcessOpcodeCB()
+{
+    uint8_t opcode;
+
+    if constexpr (Prefixed)
+    {
+        // DD/FD CB opcodes always have a displacement byte before the final opcode byte.
+        ReadImm8();
+
+        // Don't use FetchOpcode, since that increments the r register.
+        opcode = ReadPC8();
+    }
+    else
+    {
+        opcode = FetchOpcode();
+    }
+
+    switch (opcode)
+    {
+        case 0x00: ValWrapper<&Z80::Rlc, Prefixed>(reg.b); break;
+        case 0x01: ValWrapper<&Z80::Rlc, Prefixed>(reg.c); break;
+        case 0x02: ValWrapper<&Z80::Rlc, Prefixed>(reg.d); break;
+        case 0x03: ValWrapper<&Z80::Rlc, Prefixed>(reg.e); break;
+        case 0x04: ValWrapper<&Z80::Rlc, Prefixed>(reg.h); break;
+        case 0x05: ValWrapper<&Z80::Rlc, Prefixed>(reg.l); break;
+        case 0x06: PtrWrapper<&Z80::Rlc>(Indexed<Prefixed>()); break;
+        case 0x07: ValWrapper<&Z80::Rlc, Prefixed>(reg.a); break;
+
+        case 0x10: ValWrapper<&Z80::Rl, Prefixed>(reg.b); break;
+        case 0x11: ValWrapper<&Z80::Rl, Prefixed>(reg.c); break;
+        case 0x12: ValWrapper<&Z80::Rl, Prefixed>(reg.d); break;
+        case 0x13: ValWrapper<&Z80::Rl, Prefixed>(reg.e); break;
+        case 0x14: ValWrapper<&Z80::Rl, Prefixed>(reg.h); break;
+        case 0x15: ValWrapper<&Z80::Rl, Prefixed>(reg.l); break;
+        case 0x16: PtrWrapper<&Z80::Rl>(Indexed<Prefixed>()); break;
+        case 0x17: ValWrapper<&Z80::Rl, Prefixed>(reg.a); break;
+
+        case 0x20: ValWrapper<&Z80::Sla, Prefixed>(reg.b); break;
+        case 0x21: ValWrapper<&Z80::Sla, Prefixed>(reg.c); break;
+        case 0x22: ValWrapper<&Z80::Sla, Prefixed>(reg.d); break;
+        case 0x23: ValWrapper<&Z80::Sla, Prefixed>(reg.e); break;
+        case 0x24: ValWrapper<&Z80::Sla, Prefixed>(reg.h); break;
+        case 0x25: ValWrapper<&Z80::Sla, Prefixed>(reg.l); break;
+        case 0x26: PtrWrapper<&Z80::Sla>(Indexed<Prefixed>()); break;
+        case 0x27: ValWrapper<&Z80::Sla, Prefixed>(reg.a); break;
+
+        case 0x30: ValWrapper<&Z80::Sll, Prefixed>(reg.b); break;
+        case 0x31: ValWrapper<&Z80::Sll, Prefixed>(reg.c); break;
+        case 0x32: ValWrapper<&Z80::Sll, Prefixed>(reg.d); break;
+        case 0x33: ValWrapper<&Z80::Sll, Prefixed>(reg.e); break;
+        case 0x34: ValWrapper<&Z80::Sll, Prefixed>(reg.h); break;
+        case 0x35: ValWrapper<&Z80::Sll, Prefixed>(reg.l); break;
+        case 0x36: PtrWrapper<&Z80::Sll>(Indexed<Prefixed>()); break;
+        case 0x37: ValWrapper<&Z80::Sll, Prefixed>(reg.a); break;
+
+        case 0x08: ValWrapper<&Z80::Rrc, Prefixed>(reg.b); break;
+        case 0x09: ValWrapper<&Z80::Rrc, Prefixed>(reg.c); break;
+        case 0x0A: ValWrapper<&Z80::Rrc, Prefixed>(reg.d); break;
+        case 0x0B: ValWrapper<&Z80::Rrc, Prefixed>(reg.e); break;
+        case 0x0C: ValWrapper<&Z80::Rrc, Prefixed>(reg.h); break;
+        case 0x0D: ValWrapper<&Z80::Rrc, Prefixed>(reg.l); break;
+        case 0x0E: PtrWrapper<&Z80::Rrc>(Indexed<Prefixed>()); break;
+        case 0x0F: ValWrapper<&Z80::Rrc, Prefixed>(reg.a); break;
+
+        case 0x18: ValWrapper<&Z80::Rr, Prefixed>(reg.b); break;
+        case 0x19: ValWrapper<&Z80::Rr, Prefixed>(reg.c); break;
+        case 0x1A: ValWrapper<&Z80::Rr, Prefixed>(reg.d); break;
+        case 0x1B: ValWrapper<&Z80::Rr, Prefixed>(reg.e); break;
+        case 0x1C: ValWrapper<&Z80::Rr, Prefixed>(reg.h); break;
+        case 0x1D: ValWrapper<&Z80::Rr, Prefixed>(reg.l); break;
+        case 0x1E: PtrWrapper<&Z80::Rr>(Indexed<Prefixed>()); break;
+        case 0x1F: ValWrapper<&Z80::Rr, Prefixed>(reg.a); break;
+
+        case 0x28: ValWrapper<&Z80::Sra, Prefixed>(reg.b); break;
+        case 0x29: ValWrapper<&Z80::Sra, Prefixed>(reg.c); break;
+        case 0x2A: ValWrapper<&Z80::Sra, Prefixed>(reg.d); break;
+        case 0x2B: ValWrapper<&Z80::Sra, Prefixed>(reg.e); break;
+        case 0x2C: ValWrapper<&Z80::Sra, Prefixed>(reg.h); break;
+        case 0x2D: ValWrapper<&Z80::Sra, Prefixed>(reg.l); break;
+        case 0x2E: PtrWrapper<&Z80::Sra>(Indexed<Prefixed>()); break;
+        case 0x2F: ValWrapper<&Z80::Sra, Prefixed>(reg.a); break;
+
+        case 0x38: ValWrapper<&Z80::Srl, Prefixed>(reg.b); break;
+        case 0x39: ValWrapper<&Z80::Srl, Prefixed>(reg.c); break;
+        case 0x3A: ValWrapper<&Z80::Srl, Prefixed>(reg.d); break;
+        case 0x3B: ValWrapper<&Z80::Srl, Prefixed>(reg.e); break;
+        case 0x3C: ValWrapper<&Z80::Srl, Prefixed>(reg.h); break;
+        case 0x3D: ValWrapper<&Z80::Srl, Prefixed>(reg.l); break;
+        case 0x3E: PtrWrapper<&Z80::Srl>(Indexed<Prefixed>()); break;
+        case 0x3F: ValWrapper<&Z80::Srl, Prefixed>(reg.a); break;
 
         default: NotYetImplemented(opcode); break;
     }

@@ -105,7 +105,13 @@ protected:
 
     uint8_t PtrRead8(uint16_t addr);
     uint16_t PtrRead16(uint16_t addr);
+    template <bool PrefixedCB = false>
     uint16_t Indexed();
+
+    template <uint8_t (Z80::*func)(uint8_t), bool PrefixedCB = false>
+    void ValWrapper(uint8_t &r);
+    template <uint8_t (Z80::*func)(uint8_t)>
+    void PtrWrapper(uint16_t addr);
 
     void SetXYFlags(uint8_t value);
     template <typename T>
@@ -143,8 +149,23 @@ protected:
     void Xor(uint8_t value);
     void Cp(uint8_t value);
 
-    void ProcessOpcodeCB();
+    void RlcA();
+    void RlA();
+    uint8_t Rlc(uint8_t value);
+    uint8_t Rl(uint8_t value);
+    uint8_t Sla(uint8_t value);
+    uint8_t Sll(uint8_t value);
+
+    void RrcA();
+    void RrA();
+    uint8_t Rrc(uint8_t value);
+    uint8_t Rr(uint8_t value);
+    uint8_t Sra(uint8_t value);
+    uint8_t Srl(uint8_t value);
+
     void ProcessOpcodeED();
+    template <bool Prefixed>
+    void ProcessOpcodeCB();
 
     Registers reg;
     uint16_t *index = &reg.hl;
