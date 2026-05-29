@@ -45,19 +45,6 @@ protected:
         delete memory;
     }
 
-    void SetUp() override
-    {
-        ResetState();
-    }
-
-    void TearDown() override {}
-
-    void ResetState()
-    {
-        cpu->reg = Registers();
-        memory->ClearMemory();
-    }
-
     void RunInstructionTest(const QString &opcodeName, const QString &opcode);
     void FormatData(const QJsonObject &obj, QString &str);
 

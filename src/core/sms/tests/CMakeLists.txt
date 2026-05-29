@@ -1,1 +1,2 @@
+add_subdirectory(CpuBenchmark)
 add_subdirectory(Z80Test)
