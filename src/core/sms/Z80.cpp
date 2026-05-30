@@ -546,6 +546,24 @@ inline void Z80::RlA()
 }
 
 
+inline void Z80::Rld()
+{
+    uint8_t oldA = reg.a;
+    uint8_t value = memory->ReadByte(reg.hl);
+    reg.a = (reg.a & 0xF0) | ((value & 0xF0) >> 4);
+    value = (value << 4) | (oldA & 0x0F);
+    memory->WriteByte(reg.hl, value);
+
+    reg.wz = reg.hl + 1;
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(reg.a);
+    reg.flags.h = 0;
+    SetXYFlags(reg.a);
+    SetZSFlags(reg.a);
+}
+
+
 inline uint8_t Z80::Rlc(uint8_t value)
 {
     reg.flags.c = Bytes::TestBit<7>(value);
@@ -627,6 +645,24 @@ inline void Z80::RrA()
     reg.flags.n = 0;
     reg.flags.h = 0;
     SetXYFlags(reg.a);
+}
+
+
+inline void Z80::Rrd()
+{
+    uint8_t oldA = reg.a;
+    uint8_t value = memory->ReadByte(reg.hl);
+    reg.a = (reg.a & 0xF0) | (value & 0x0F);
+    value = ((oldA & 0x0F) << 4) | (value >> 4);
+    memory->WriteByte(reg.hl, value);
+
+    reg.wz = reg.hl + 1;
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(reg.a);
+    reg.flags.h = 0;
+    SetXYFlags(reg.a);
+    SetZSFlags(reg.a);
 }
 
 
@@ -993,6 +1029,15 @@ void Z80::ProcessOpcodeED()
 
         case 0x42: case 0x52: case 0x62: case 0x72: // SBC HL, rr
             Sbc16(reg.hl, GetReg16(opcode)); break;
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Rotate & Shift
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0x6F: // RLD
+            Rld(); break;
+        case 0x67: // RRD
+            Rrd(); break;
 
         default: NotYetImplemented(opcode); break;
     }

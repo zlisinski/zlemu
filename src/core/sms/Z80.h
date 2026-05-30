@@ -165,6 +165,7 @@ protected:
 
     void RlcA();
     void RlA();
+    void Rld();
     uint8_t Rlc(uint8_t value);
     uint8_t Rl(uint8_t value);
     uint8_t Sla(uint8_t value);
@@ -172,6 +173,7 @@ protected:
 
     void RrcA();
     void RrA();
+    void Rrd();
     uint8_t Rrc(uint8_t value);
     uint8_t Rr(uint8_t value);
     uint8_t Sra(uint8_t value);
