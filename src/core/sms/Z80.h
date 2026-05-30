@@ -121,10 +121,10 @@ protected:
     template <bool PrefixedCB = false>
     uint16_t Indexed();
 
-    template <uint8_t (Z80::*func)(uint8_t), bool PrefixedCB = false>
-    void ValWrapper(uint8_t &r);
-    template <uint8_t (Z80::*func)(uint8_t)>
-    void PtrWrapper(uint16_t addr);
+    template <auto Func, bool PrefixedCB = false>
+    void ValWrapper(uint8_t &r, auto&&... args);
+    template <auto Func>
+    void PtrWrapper(uint16_t addr, auto&&... args);
 
     void SetXYFlags(uint8_t value);
     template <typename T>
@@ -176,6 +176,11 @@ protected:
     uint8_t Rr(uint8_t value);
     uint8_t Sra(uint8_t value);
     uint8_t Srl(uint8_t value);
+
+    template <bool IsPtr = false>
+    void Bit(uint8_t value, uint8_t bit);
+    uint8_t ResBit(uint8_t value, uint8_t bit);
+    uint8_t SetBit(uint8_t value, uint8_t bit);
 
     void ProcessOpcodeED();
     template <bool Prefixed>

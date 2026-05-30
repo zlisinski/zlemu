@@ -1,3 +1,4 @@
+#include <functional>
 #include <stdexcept>
 
 #include "../Bytes.h"
@@ -154,28 +155,27 @@ inline uint16_t Z80::Indexed()
 }
 
 
-template <uint8_t (Z80::*func)(uint8_t), bool PrefixedCB>
-inline void Z80::ValWrapper(uint8_t &r)
+template <auto Func, bool PrefixedCB>
+inline void Z80::ValWrapper(uint8_t &r, auto&&... args)
 {
     if constexpr (PrefixedCB)
     {
         uint16_t addr = Indexed<PrefixedCB>();
         r = PtrRead8(addr);
-        r = (this->*func)(r);
+        r = std::invoke(Func, this, r, std::forward<decltype(args)>(args)...);
         LoadPointer8(addr, r);
     }
     else
     {
-        r = (this->*func)(r);
+        r = std::invoke(Func, this, r, std::forward<decltype(args)>(args)...);
     }
 }
 
-
-template <uint8_t (Z80::*func)(uint8_t)>
-inline void Z80::PtrWrapper(uint16_t addr)
+template <auto Func>
+inline void Z80::PtrWrapper(uint16_t addr, auto&&... args)
 {
     uint8_t value = PtrRead8(addr);
-    value = (this->*func)(value);
+    value = std::invoke(Func, this, value, std::forward<decltype(args)>(args)...);
     LoadPointer8(addr, value);
 }
 
@@ -661,7 +661,7 @@ inline uint8_t Z80::Rr(uint8_t value)
 }
 
 
-uint8_t Z80::Sra(uint8_t value)
+inline uint8_t Z80::Sra(uint8_t value)
 {
     reg.flags.c = Bytes::TestBit<0>(value);
     value = static_cast<int8_t>(value) >> 1;
@@ -676,7 +676,7 @@ uint8_t Z80::Sra(uint8_t value)
 }
 
 
-uint8_t Z80::Srl(uint8_t value)
+inline uint8_t Z80::Srl(uint8_t value)
 {
     reg.flags.c = Bytes::TestBit<0>(value);
     value >>= 1;
@@ -688,6 +688,34 @@ uint8_t Z80::Srl(uint8_t value)
     SetZSFlags(value);
 
     return value;
+}
+
+
+template <bool IsPtr>
+inline void Z80::Bit(uint8_t value, uint8_t bit)
+{
+    uint8_t result = value & (0x01 << bit);
+    reg.flags.n = 0;
+    reg.flags.p = result == 0;
+    reg.flags.h = 1;
+    SetZSFlags(result);
+
+    if constexpr (IsPtr)
+        SetXYFlags(reg.w);
+    else
+        SetXYFlags(value);
+}
+
+
+inline uint8_t Z80::ResBit(uint8_t value, uint8_t bit)
+{
+    return value & ~(1 << bit);
+}
+
+
+inline uint8_t Z80::SetBit(uint8_t value, uint8_t bit)
+{
+    return value | (1 << bit);
 }
 
 
@@ -990,6 +1018,7 @@ void Z80::ProcessOpcodeCB()
     }
 
     uint8_t &src = GetSrcReg8Unindexed(opcode);
+    uint8_t bit = (opcode >> 3) & 0x07;
 
     switch (opcode)
     {
@@ -1040,6 +1069,49 @@ void Z80::ProcessOpcodeCB()
             ValWrapper<&Z80::Srl, Prefixed>(src); break;
         case 0x3E:
             PtrWrapper<&Z80::Srl>(Indexed<Prefixed>()); break;
+
+        // BIT
+        case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47:
+        case 0x48: case 0x49: case 0x4A: case 0x4B: case 0x4C: case 0x4D: case 0x4F:
+        case 0x50: case 0x51: case 0x52: case 0x53: case 0x54: case 0x55: case 0x57:
+        case 0x58: case 0x59: case 0x5A: case 0x5B: case 0x5C: case 0x5D: case 0x5F:
+        case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x67:
+        case 0x68: case 0x69: case 0x6A: case 0x6B: case 0x6C: case 0x6D: case 0x6F:
+        case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77:
+        case 0x78: case 0x79: case 0x7A: case 0x7B: case 0x7C: case 0x7D: case 0x7F:
+            if constexpr (Prefixed)
+                Bit<true>(PtrRead8(Indexed<Prefixed>()), bit);
+            else
+                Bit<false>(src, bit);
+            break;
+        case 0x46: case 0x4E: case 0x56: case 0x5E: case 0x66: case 0x6E: case 0x76: case 0x7E:
+            Bit<true>(PtrRead8(Indexed<Prefixed>()), bit); break;
+
+        // RES
+        case 0x80: case 0x81: case 0x82: case 0x83: case 0x84: case 0x85: case 0x87:
+        case 0x88: case 0x89: case 0x8A: case 0x8B: case 0x8C: case 0x8D: case 0x8F:
+        case 0x90: case 0x91: case 0x92: case 0x93: case 0x94: case 0x95: case 0x97:
+        case 0x98: case 0x99: case 0x9A: case 0x9B: case 0x9C: case 0x9D: case 0x9F:
+        case 0xA0: case 0xA1: case 0xA2: case 0xA3: case 0xA4: case 0xA5: case 0xA7:
+        case 0xA8: case 0xA9: case 0xAA: case 0xAB: case 0xAC: case 0xAD: case 0xAF:
+        case 0xB0: case 0xB1: case 0xB2: case 0xB3: case 0xB4: case 0xB5: case 0xB7:
+        case 0xB8: case 0xB9: case 0xBA: case 0xBB: case 0xBC: case 0xBD: case 0xBF:
+            ValWrapper<&Z80::ResBit, Prefixed>(src, bit); break;
+        case 0x86: case 0x8E: case 0x96: case 0x9E: case 0xA6: case 0xAE: case 0xB6: case 0xBE:
+            PtrWrapper<&Z80::ResBit>(Indexed<Prefixed>(), bit); break;
+
+        // SET
+        case 0xC0: case 0xC1: case 0xC2: case 0xC3: case 0xC4: case 0xC5: case 0xC7:
+        case 0xC8: case 0xC9: case 0xCA: case 0xCB: case 0xCC: case 0xCD: case 0xCF:
+        case 0xD0: case 0xD1: case 0xD2: case 0xD3: case 0xD4: case 0xD5: case 0xD7:
+        case 0xD8: case 0xD9: case 0xDA: case 0xDB: case 0xDC: case 0xDD: case 0xDF:
+        case 0xE0: case 0xE1: case 0xE2: case 0xE3: case 0xE4: case 0xE5: case 0xE7:
+        case 0xE8: case 0xE9: case 0xEA: case 0xEB: case 0xEC: case 0xED: case 0xEF:
+        case 0xF0: case 0xF1: case 0xF2: case 0xF3: case 0xF4: case 0xF5: case 0xF7:
+        case 0xF8: case 0xF9: case 0xFA: case 0xFB: case 0xFC: case 0xFD: case 0xFF:
+            ValWrapper<&Z80::SetBit, Prefixed>(src, bit); break;
+        case 0xC6: case 0xCE: case 0xD6: case 0xDE: case 0xE6: case 0xEE: case 0xF6: case 0xFE:
+            PtrWrapper<&Z80::SetBit>(Indexed<Prefixed>(), bit); break;
 
         default: NotYetImplemented(opcode); break;
     }
