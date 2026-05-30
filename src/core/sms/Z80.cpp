@@ -57,6 +57,66 @@ inline void Z80::ReadImm16()
 }
 
 
+inline uint8_t &Z80::GetSrcReg8(uint8_t opcode)
+{
+    return *regTable8[opcode & 0x07];
+}
+
+
+inline uint8_t &Z80::GetDestReg8(uint8_t opcode)
+{
+    return *regTable8[(opcode >> 3) & 0x07];
+}
+
+
+inline uint8_t &Z80::GetSrcReg8Unindexed(uint8_t opcode)
+{
+    return *regTableUnindexed8[opcode & 0x07];
+}
+
+
+inline uint8_t &Z80::GetDestReg8Unindexed(uint8_t opcode)
+{
+    return *regTableUnindexed8[(opcode >> 3) & 0x07];
+}
+
+
+inline uint16_t &Z80::GetReg16(uint8_t opcode)
+{
+    return *regTable16[(opcode >> 4) & 0x03];
+}
+
+
+inline uint16_t &Z80::GetReg16Stack(uint8_t opcode)
+{
+    return *regTable16Stack[(opcode >> 4) & 0x03];
+}
+
+
+inline void Z80::SetIndexType(IndexType type)
+{
+    indexType = type;
+    switch (type)
+    {
+        case IndexType::HL:
+            index = regTable16[2] = regTable16Stack[2] = &reg.hl;
+            indexH = regTable8[4] = &reg.h;
+            indexL = regTable8[5] = &reg.l;
+            break;
+        case IndexType::IX:
+            index = regTable16[2] = regTable16Stack[2] = &reg.ix;
+            indexH = regTable8[4] = &reg.ixh;
+            indexL = regTable8[5] = &reg.ixl;
+            break;
+        case IndexType::IY:
+            index = regTable16[2] = regTable16Stack[2] = &reg.iy;
+            indexH = regTable8[4] = &reg.iyh;
+            indexL = regTable8[5] = &reg.iyl;
+            break;
+    }
+}
+
+
 inline uint8_t Z80::PtrRead8(uint16_t addr)
 {
     return memory->ReadByte(addr);
@@ -610,25 +670,16 @@ void Z80::ProcessOpcode()
     uint8_t opcode = FetchOpcode();
 
     operandCount = 0;
-    index = &reg.hl;
-    indexH = &reg.h;
-    indexL = &reg.l;
+    SetIndexType(IndexType::HL);
 
     // Multiple prefix bytes are allowed and just overwrite the previous one.
     while (opcode == 0xDD || opcode == 0xFD)
     {
         if (opcode == 0xDD)
-        {
-            index = &reg.ix;
-            indexH = &reg.ixh;
-            indexL = &reg.ixl;
-        }
+            SetIndexType(IndexType::IX);
         else
-        {
-            index = &reg.iy;
-            indexH = &reg.iyh;
-            indexL = &reg.iyl;
-        }
+            SetIndexType(IndexType::IY);
+
         opcode = FetchOpcode();
     }
 
@@ -644,9 +695,8 @@ void Z80::ProcessOpcode()
     if (opcode == 0xED)
     {
         // 0xED ignores any previously set prefix.
-        index = &reg.hl;
-        indexH = &reg.h;
-        indexL = &reg.l;
+        SetIndexType(IndexType::HL);
+
         ProcessOpcodeED();
         return;
     }
@@ -654,106 +704,46 @@ void Z80::ProcessOpcode()
     switch (opcode)
     {
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Register, Register
+        /// Loads
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x40: LoadRegister8(reg.b, reg.b); break;
-        case 0x41: LoadRegister8(reg.b, reg.c); break;
-        case 0x42: LoadRegister8(reg.b, reg.d); break;
-        case 0x43: LoadRegister8(reg.b, reg.e); break;
-        case 0x44: LoadRegister8(reg.b, *indexH); break;
-        case 0x45: LoadRegister8(reg.b, *indexL); break;
-        case 0x47: LoadRegister8(reg.b, reg.a); break;
-        case 0x48: LoadRegister8(reg.c, reg.b); break;
-        case 0x49: LoadRegister8(reg.c, reg.c); break;
-        case 0x4A: LoadRegister8(reg.c, reg.d); break;
-        case 0x4B: LoadRegister8(reg.c, reg.e); break;
-        case 0x4C: LoadRegister8(reg.c, *indexH); break;
-        case 0x4D: LoadRegister8(reg.c, *indexL); break;
-        case 0x4F: LoadRegister8(reg.c, reg.a); break;
-        case 0x50: LoadRegister8(reg.d, reg.b); break;
-        case 0x51: LoadRegister8(reg.d, reg.c); break;
-        case 0x52: LoadRegister8(reg.d, reg.d); break;
-        case 0x53: LoadRegister8(reg.d, reg.e); break;
-        case 0x54: LoadRegister8(reg.d, *indexH); break;
-        case 0x55: LoadRegister8(reg.d, *indexL); break;
-        case 0x57: LoadRegister8(reg.d, reg.a); break;
-        case 0x58: LoadRegister8(reg.e, reg.b); break;
-        case 0x59: LoadRegister8(reg.e, reg.c); break;
-        case 0x5A: LoadRegister8(reg.e, reg.d); break;
-        case 0x5B: LoadRegister8(reg.e, reg.e); break;
-        case 0x5C: LoadRegister8(reg.e, *indexH); break;
-        case 0x5D: LoadRegister8(reg.e, *indexL); break;
-        case 0x5F: LoadRegister8(reg.e, reg.a); break;
-        case 0x60: LoadRegister8(*indexH, reg.b); break;
-        case 0x61: LoadRegister8(*indexH, reg.c); break;
-        case 0x62: LoadRegister8(*indexH, reg.d); break;
-        case 0x63: LoadRegister8(*indexH, reg.e); break;
-        case 0x64: LoadRegister8(*indexH, *indexH); break;
-        case 0x65: LoadRegister8(*indexH, *indexL); break;
-        case 0x67: LoadRegister8(*indexH, reg.a); break;
-        case 0x68: LoadRegister8(*indexL, reg.b); break;
-        case 0x69: LoadRegister8(*indexL, reg.c); break;
-        case 0x6A: LoadRegister8(*indexL, reg.d); break;
-        case 0x6B: LoadRegister8(*indexL, reg.e); break;
-        case 0x6C: LoadRegister8(*indexL, *indexH); break;
-        case 0x6D: LoadRegister8(*indexL, *indexL); break;
-        case 0x6F: LoadRegister8(*indexL, reg.a); break;
-        case 0x78: LoadRegister8(reg.a, reg.b); break;
-        case 0x79: LoadRegister8(reg.a, reg.c); break;
-        case 0x7A: LoadRegister8(reg.a, reg.d); break;
-        case 0x7B: LoadRegister8(reg.a, reg.e); break;
-        case 0x7C: LoadRegister8(reg.a, *indexH); break;
-        case 0x7D: LoadRegister8(reg.a, *indexL); break;
-        case 0x7F: LoadRegister8(reg.a, reg.a); break;
-        case 0xF9: LoadRegister16(reg.sp, *index); break;
+        case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47: // LD B, r
+        case 0x48: case 0x49: case 0x4A: case 0x4B: case 0x4C: case 0x4D: case 0x4F: // LD C, r
+        case 0x50: case 0x51: case 0x52: case 0x53: case 0x54: case 0x55: case 0x57: // LD D, r
+        case 0x58: case 0x59: case 0x5A: case 0x5B: case 0x5C: case 0x5D: case 0x5F: // LD E, r
+        case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x67: // LD H|IXH|IYH, r
+        case 0x68: case 0x69: case 0x6A: case 0x6B: case 0x6C: case 0x6D: case 0x6F: // LD L|IXL|IYL, r
+        case 0x78: case 0x79: case 0x7A: case 0x7B: case 0x7C: case 0x7D: case 0x7F: // LD A, r
+            LoadRegister8(GetDestReg8(opcode), GetSrcReg8(opcode)); break;
 
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Register, Immediate
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x3E: // LD r, n
+            ReadImm8(); LoadRegister8(GetDestReg8(opcode), operand[0]); break;
 
-        case 0x06: ReadImm8(); LoadRegister8(reg.b, operand[0]); break;
-        case 0x0E: ReadImm8(); LoadRegister8(reg.c, operand[0]); break;
-        case 0x16: ReadImm8(); LoadRegister8(reg.d, operand[0]); break;
-        case 0x1E: ReadImm8(); LoadRegister8(reg.e, operand[0]); break;
-        case 0x26: ReadImm8(); LoadRegister8(*indexH, operand[0]); break;
-        case 0x2E: ReadImm8(); LoadRegister8(*indexL, operand[0]); break;
-        case 0x3E: ReadImm8(); LoadRegister8(reg.a, operand[0]); break;
+        case 0x46: case 0x4E: case 0x56: case 0x5E: case 0x66: case 0x6E: case 0x7E: // LD r, (HL|IX+d|IY+d)
+            LoadRegister8(GetDestReg8Unindexed(opcode), PtrRead8(Indexed())); break;
 
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Register, Pointer
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        case 0x0A: case 0x1A: // LD A, (rr)
+            LoadRegister8(reg.a, PtrRead8(GetReg16(opcode))); break;
 
-        case 0x46: LoadRegister8(reg.b, PtrRead8(Indexed())); break;
-        case 0x4E: LoadRegister8(reg.c, PtrRead8(Indexed())); break;
-        case 0x56: LoadRegister8(reg.d, PtrRead8(Indexed())); break;
-        case 0x5E: LoadRegister8(reg.e, PtrRead8(Indexed())); break;
-        case 0x66: LoadRegister8(reg.h, PtrRead8(Indexed())); break;
-        case 0x6E: LoadRegister8(reg.l, PtrRead8(Indexed())); break;
-        case 0x7E: LoadRegister8(reg.a, PtrRead8(Indexed())); break;
-        case 0x0A: LoadRegister8(reg.a, PtrRead8(reg.bc)); break;
-        case 0x1A: LoadRegister8(reg.a, PtrRead8(reg.de)); break;
+        case 0x2A: // LD HL|IX|IY, (nn)
+            ReadImm16(); LoadRegister16(*index, PtrRead16(operandWord)); break;
 
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Pointer, Register
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        case 0x3A: // LD A, (nn)
+            ReadImm16(); LoadRegister8(reg.a, PtrRead8(operandWord)); break;
 
-        case 0x70: LoadPointer8(Indexed(), reg.b); break;
-        case 0x71: LoadPointer8(Indexed(), reg.c); break;
-        case 0x72: LoadPointer8(Indexed(), reg.d); break;
-        case 0x73: LoadPointer8(Indexed(), reg.e); break;
-        case 0x74: LoadPointer8(Indexed(), reg.h); break;
-        case 0x75: LoadPointer8(Indexed(), reg.l); break;
-        case 0x77: LoadPointer8(Indexed(), reg.a); break;
-        case 0x02: LoadPointer8(reg.bc, reg.a); break;
-        case 0x12: LoadPointer8(reg.de, reg.a); break;
-        case 0x32: ReadImm16(); LoadPointer8(operandWord, reg.a); break;
+        case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77: // LD (HL|IX+d|IY+d), r
+            LoadPointer8(Indexed(), GetSrcReg8Unindexed(opcode)); break;
 
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Pointer, Immediate
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        case 0x02: case 0x12: // LD (rr), A
+            LoadPointer8(GetReg16(opcode), reg.a); break;
 
-        case 0x36:
+        case 0x22: // LD (nn), HL|IX|IY
+            ReadImm16(); LoadPointer16(operandWord, *index); break;
+
+        case 0x32: // LD (nn), A
+            ReadImm16(); LoadPointer8(operandWord, reg.a); break;
+
+        case 0x36: // LD (HL|IX+d|IY+d), n
         {
             uint16_t addr = Indexed(); // DD or FD prefixes will call ReadImm8().
             ReadImm8();
@@ -761,58 +751,39 @@ void Z80::ProcessOpcode()
             break;
         }
 
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Register, Immediate Pointer
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        case 0x01: case 0x11: case 0x21: case 0x31: // LD rr, nn
+            ReadImm16(); LoadRegister16(GetReg16(opcode), operandWord); break;
 
-        case 0x3A: ReadImm16(); LoadRegister8(reg.a, PtrRead8(operandWord)); break;
-
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Register Pair, Immediate Word
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        case 0x01: ReadImm16(); LoadRegister16(reg.bc, operandWord); break;
-        case 0x11: ReadImm16(); LoadRegister16(reg.de, operandWord); break;
-        case 0x21: ReadImm16(); LoadRegister16(*index, operandWord); break;
-        case 0x31: ReadImm16(); LoadRegister16(reg.sp, operandWord); break;
-
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Register Pair, Immediate Pointer
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        case 0x2A: ReadImm16(); LoadRegister16(*index, PtrRead16(operandWord)); break;
-
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Immediate Pointer Word, Register Pair
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        case 0x22: ReadImm16(); LoadPointer16(operandWord, *index); break;
+        case 0xF9: // LD SP, HL|IX|IY
+            LoadRegister16(reg.sp, *index); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Stack
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0xC5: Push(reg.bc); break;
-        case 0xD5: Push(reg.de); break;
-        case 0xE5: Push(*index); break;
-        case 0xF5: Push(reg.af); break;
-        case 0xC1: Pop(reg.bc); break;
-        case 0xD1: Pop(reg.de); break;
-        case 0xE1: Pop(*index); break;
-        case 0xF1: Pop(reg.af); break;
+        case 0xC5: case 0xD5: case 0xE5: case 0xF5: // Push rr
+            Push(GetReg16Stack(opcode)); break;
+
+        case 0xC1: case 0xD1: case 0xE1: case 0xF1: // Pop rr
+            Pop(GetReg16Stack(opcode)); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Exchange
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0xEB: std::swap(reg.de, reg.hl); break;
-        case 0x08: std::swap(reg.af, reg.af_); break;
-        case 0xD9:
+        case 0xEB: // EX DE, HL
+            std::swap(reg.de, reg.hl); break;
+
+        case 0x08: // EX AF, AF'
+            std::swap(reg.af, reg.af_); break;
+
+        case 0xD9: // EXX
             std::swap(reg.bc, reg.bc_);
             std::swap(reg.de, reg.de_);
             std::swap(reg.hl, reg.hl_);
             break;
-        case 0xE3:
+
+        case 0xE3: // EX (SP), HL|IX|IY
         {
             uint16_t old = *index;
             *index = memory->ReadWord(reg.sp);
@@ -824,118 +795,81 @@ void Z80::ProcessOpcode()
         /// Arithmetic
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x80: Add8(reg.b); break;
-        case 0x81: Add8(reg.c); break;
-        case 0x82: Add8(reg.d); break;
-        case 0x83: Add8(reg.e); break;
-        case 0x84: Add8(*indexH); break;
-        case 0x85: Add8(*indexL); break;
-        case 0x86: Add8(PtrRead8(Indexed())); break;
-        case 0x87: Add8(reg.a); break;
-        case 0xC6: ReadImm8(); Add8(operand[0]); break;
-        case 0x09: Add16(*index, reg.bc); break;
-        case 0x19: Add16(*index, reg.de); break;
-        case 0x29: Add16(*index, *index); break;
-        case 0x39: Add16(*index, reg.sp); break;
+        case 0x80: case 0x81: case 0x82: case 0x83: case 0x84: case 0x85: case 0x87: // ADD r
+            Add8(GetSrcReg8(opcode)); break;
+        case 0x86: // ADD (HL|IX+d|IY+d)
+            Add8(PtrRead8(Indexed())); break;
+        case 0xC6: // ADD n
+            ReadImm8(); Add8(operand[0]); break;
+        case 0x09: case 0x19: case 0x29: case 0x39: // ADD HL|IX|IY, rr
+            Add16(*index, GetReg16(opcode)); break;
 
-        case 0x88: Add8(reg.b, reg.flags.c); break;
-        case 0x89: Add8(reg.c, reg.flags.c); break;
-        case 0x8A: Add8(reg.d, reg.flags.c); break;
-        case 0x8B: Add8(reg.e, reg.flags.c); break;
-        case 0x8C: Add8(*indexH, reg.flags.c); break;
-        case 0x8D: Add8(*indexL, reg.flags.c); break;
-        case 0x8E: Add8(PtrRead8(Indexed()), reg.flags.c); break;
-        case 0x8F: Add8(reg.a, reg.flags.c); break;
-        case 0xCE: ReadImm8(); Add8(operand[0], reg.flags.c); break;
+        case 0x88: case 0x89: case 0x8A: case 0x8B: case 0x8C: case 0x8D: case 0x8F: // ADC r
+            Add8(GetSrcReg8(opcode), reg.flags.c); break;
+        case 0x8E: // ADC (HL|IX+d|IY+d)
+            Add8(PtrRead8(Indexed()), reg.flags.c); break;
+        case 0xCE: // ADC n
+            ReadImm8(); Add8(operand[0], reg.flags.c); break;
 
-        case 0x90: Sub8(reg.b); break;
-        case 0x91: Sub8(reg.c); break;
-        case 0x92: Sub8(reg.d); break;
-        case 0x93: Sub8(reg.e); break;
-        case 0x94: Sub8(*indexH); break;
-        case 0x95: Sub8(*indexL); break;
-        case 0x96: Sub8(PtrRead8(Indexed())); break;
-        case 0x97: Sub8(reg.a); break;
-        case 0xD6: ReadImm8(); Sub8(operand[0]); break;
+        case 0x90: case 0x91: case 0x92: case 0x93:case 0x94: case 0x95: case 0x97: // SUB r
+            Sub8(GetSrcReg8(opcode)); break;
+        case 0x96: // SUB (HL|IX+d|IY+d)
+            Sub8(PtrRead8(Indexed())); break;
+        case 0xD6: // SUB n
+            ReadImm8(); Sub8(operand[0]); break;
 
-        case 0x98: Sub8(reg.b, reg.flags.c); break;
-        case 0x99: Sub8(reg.c, reg.flags.c); break;
-        case 0x9A: Sub8(reg.d, reg.flags.c); break;
-        case 0x9B: Sub8(reg.e, reg.flags.c); break;
-        case 0x9C: Sub8(*indexH, reg.flags.c); break;
-        case 0x9D: Sub8(*indexL, reg.flags.c); break;
-        case 0x9E: Sub8(PtrRead8(Indexed()), reg.flags.c); break;
-        case 0x9F: Sub8(reg.a, reg.flags.c); break;
-        case 0xDE: ReadImm8(); Sub8(operand[0], reg.flags.c); break;
+        case 0x98: case 0x99: case 0x9A: case 0x9B: case 0x9C: case 0x9D: case 0x9F: // SBC r
+            Sub8(GetSrcReg8(opcode), reg.flags.c); break;
+        case 0x9E: // SBC (HL|IX+d|IY+d)
+            Sub8(PtrRead8(Indexed()), reg.flags.c); break;
+        case 0xDE: // SBC n
+            ReadImm8(); Sub8(operand[0], reg.flags.c); break;
 
-        case 0x04: Inc8(reg.b); break;
-        case 0x0C: Inc8(reg.c); break;
-        case 0x14: Inc8(reg.d); break;
-        case 0x1C: Inc8(reg.e); break;
-        case 0x24: Inc8(*indexH); break;
-        case 0x2C: Inc8(*indexL); break;
-        case 0x34: IncPtr8(Indexed()); break;
-        case 0x3C: Inc8(reg.a); break;
-        case 0x03: Inc16(reg.bc); break;
-        case 0x13: Inc16(reg.de); break;
-        case 0x23: Inc16(*index); break;
-        case 0x33: Inc16(reg.sp); break;
+        case 0x04: case 0x0C: case 0x14: case 0x1C: case 0x24: case 0x2C: case 0x3C: // INC r
+            Inc8(GetDestReg8(opcode)); break;
+        case 0x34: // INC (HL|IX+d|IY+d)
+            IncPtr8(Indexed()); break;
+        case 0x03: case 0x13: case 0x23: case 0x33: // INC rr
+            Inc16(GetReg16(opcode)); break;
 
-        case 0x05: Dec8(reg.b); break;
-        case 0x0D: Dec8(reg.c); break;
-        case 0x15: Dec8(reg.d); break;
-        case 0x1D: Dec8(reg.e); break;
-        case 0x25: Dec8(*indexH); break;
-        case 0x2D: Dec8(*indexL); break;
-        case 0x35: DecPtr8(Indexed()); break;
-        case 0x3D: Dec8(reg.a); break;
-        case 0x0B: Dec16(reg.bc); break;
-        case 0x1B: Dec16(reg.de); break;
-        case 0x2B: Dec16(*index); break;
-        case 0x3B: Dec16(reg.sp); break;
+        case 0x05: case 0x0D: case 0x15: case 0x1D: case 0x25: case 0x2D: case 0x3D: // DEC r
+            Dec8(GetDestReg8(opcode)); break;
+        case 0x35: // DEC (HL|IX+d|IY+d)
+            DecPtr8(Indexed()); break;
+        case 0x0B: case 0x1B: case 0x2B: case 0x3B: // DEC rr
+            Dec16(GetReg16(opcode)); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Logic
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0xA0: And(reg.b); break;
-        case 0xA1: And(reg.c); break;
-        case 0xA2: And(reg.d); break;
-        case 0xA3: And(reg.e); break;
-        case 0xA4: And(*indexH); break;
-        case 0xA5: And(*indexL); break;
-        case 0xA6: And(PtrRead8(Indexed())); break;
-        case 0xA7: And(reg.a); break;
-        case 0xE6: ReadImm8(); And(operand[0]); break;
+        case 0xA0: case 0xA1: case 0xA2: case 0xA3: case 0xA4: case 0xA5: case 0xA7: // AND r
+            And(GetSrcReg8(opcode)); break;
+        case 0xA6: // AND (HL|IX+d|IY+d)
+            And(PtrRead8(Indexed())); break;
+        case 0xE6: // AND n
+            ReadImm8(); And(operand[0]); break;
 
-        case 0xB0: Or(reg.b); break;
-        case 0xB1: Or(reg.c); break;
-        case 0xB2: Or(reg.d); break;
-        case 0xB3: Or(reg.e); break;
-        case 0xB4: Or(*indexH); break;
-        case 0xB5: Or(*indexL); break;
-        case 0xB6: Or(PtrRead8(Indexed())); break;
-        case 0xB7: Or(reg.a); break;
-        case 0xF6: ReadImm8(); Or(operand[0]); break;
+        case 0xB0: case 0xB1: case 0xB2: case 0xB3: case 0xB4: case 0xB5: case 0xB7: // OR r
+            Or(GetSrcReg8(opcode)); break;
+        case 0xB6: // OR (HL|IX+d|IY+d)
+            Or(PtrRead8(Indexed())); break;
+        case 0xF6: // OR n
+            ReadImm8(); Or(operand[0]); break;
 
-        case 0xA8: Xor(reg.b); break;
-        case 0xA9: Xor(reg.c); break;
-        case 0xAA: Xor(reg.d); break;
-        case 0xAB: Xor(reg.e); break;
-        case 0xAC: Xor(*indexH); break;
-        case 0xAD: Xor(*indexL); break;
-        case 0xAE: Xor(PtrRead8(Indexed())); break;
-        case 0xAF: Xor(reg.a); break;
-        case 0xEE: ReadImm8(); Xor(operand[0]); break;
+        case 0xA8: case 0xA9: case 0xAA: case 0xAB: case 0xAC: case 0xAD: case 0xAF: // XOR r
+            Xor(GetSrcReg8(opcode)); break;
+        case 0xAE: // XOR (HL|IX+d|IY+d)
+            Xor(PtrRead8(Indexed())); break;
+        case 0xEE: // XOR n
+            ReadImm8(); Xor(operand[0]); break;
 
-        case 0xB8: Cp(reg.b); break;
-        case 0xB9: Cp(reg.c); break;
-        case 0xBA: Cp(reg.d); break;
-        case 0xBB: Cp(reg.e); break;
-        case 0xBC: Cp(*indexH); break;
-        case 0xBD: Cp(*indexL); break;
-        case 0xBE: Cp(PtrRead8(Indexed())); break;
-        case 0xBF: Cp(reg.a); break;
+        case 0xB8: case 0xB9: case 0xBA: case 0xBB: case 0xBC: case 0xBD: case 0xBF: // CP r
+            Cp(GetSrcReg8(opcode)); break;
+        case 0xBE: // CP (HL|IX+d|IY+d)
+            Cp(PtrRead8(Indexed())); break;
+        case 0xFE: // CP n
+            ReadImm8(); Cp(operand[0]); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Rotate & Shift
@@ -958,31 +892,21 @@ void Z80::ProcessOpcodeED()
     switch (opcode)
     {
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Register, Register
+        /// Loads
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x47: LoadRegister8(reg.i, reg.a); break;
-        case 0x4F: LoadRegister8(reg.r, reg.a); break;
-        case 0x57: LoadRegister8(reg.a, reg.i); SetIRFlags(); break;
-        case 0x5F: LoadRegister8(reg.a, reg.r); SetIRFlags(); break;
-
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Register Pair, Immediate Pointer
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        case 0x4B: ReadImm16(); LoadRegister16(reg.bc, PtrRead16(operandWord)); break;
-        case 0x5B: ReadImm16(); LoadRegister16(reg.de, PtrRead16(operandWord)); break;
-        case 0x6B: ReadImm16(); LoadRegister16(reg.hl, PtrRead16(operandWord)); break;
-        case 0x7B: ReadImm16(); LoadRegister16(reg.sp, PtrRead16(operandWord)); break;
-
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LD Immediate Pointer Word, Register Pair
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        case 0x43: ReadImm16(); LoadPointer16(operandWord, reg.bc); break;
-        case 0x53: ReadImm16(); LoadPointer16(operandWord, reg.de); break;
-        case 0x63: ReadImm16(); LoadPointer16(operandWord, reg.hl); break;
-        case 0x73: ReadImm16(); LoadPointer16(operandWord, reg.sp); break;
+        case 0x47: // LD I, A
+            LoadRegister8(reg.i, reg.a); break;
+        case 0x4F: // LD R, A
+            LoadRegister8(reg.r, reg.a); break;
+        case 0x57: // LD A, I
+            LoadRegister8(reg.a, reg.i); SetIRFlags(); break;
+        case 0x5F: // LD A, R
+            LoadRegister8(reg.a, reg.r); SetIRFlags(); break;
+        case 0x4B: case 0x5B: case 0x6B: case 0x7B: // LD rr, nn
+            ReadImm16(); LoadRegister16(GetReg16(opcode), PtrRead16(operandWord)); break;
+        case 0x43: case 0x53: case 0x63: case 0x73: // (nn), rr
+            ReadImm16(); LoadPointer16(operandWord, GetReg16(opcode)); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Block Transfer
@@ -1001,15 +925,11 @@ void Z80::ProcessOpcodeED()
         /// Arithmetic
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x4A: Adc16(reg.hl, reg.bc); break;
-        case 0x5A: Adc16(reg.hl, reg.de); break;
-        case 0x6A: Adc16(reg.hl, reg.hl); break;
-        case 0x7A: Adc16(reg.hl, reg.sp); break;
+        case 0x4A: case 0x5A: case 0x6A: case 0x7A: // ADC HL, rr
+            Adc16(reg.hl, GetReg16(opcode)); break;
 
-        case 0x42: Sbc16(reg.hl, reg.bc); break;
-        case 0x52: Sbc16(reg.hl, reg.de); break;
-        case 0x62: Sbc16(reg.hl, reg.hl); break;
-        case 0x72: Sbc16(reg.hl, reg.sp); break;
+        case 0x42: case 0x52: case 0x62: case 0x72: // SBC HL, rr
+            Sbc16(reg.hl, GetReg16(opcode)); break;
 
         default: NotYetImplemented(opcode); break;
     }
@@ -1034,79 +954,57 @@ void Z80::ProcessOpcodeCB()
         opcode = FetchOpcode();
     }
 
+    uint8_t &src = GetSrcReg8Unindexed(opcode);
+
     switch (opcode)
     {
-        case 0x00: ValWrapper<&Z80::Rlc, Prefixed>(reg.b); break;
-        case 0x01: ValWrapper<&Z80::Rlc, Prefixed>(reg.c); break;
-        case 0x02: ValWrapper<&Z80::Rlc, Prefixed>(reg.d); break;
-        case 0x03: ValWrapper<&Z80::Rlc, Prefixed>(reg.e); break;
-        case 0x04: ValWrapper<&Z80::Rlc, Prefixed>(reg.h); break;
-        case 0x05: ValWrapper<&Z80::Rlc, Prefixed>(reg.l); break;
-        case 0x06: PtrWrapper<&Z80::Rlc>(Indexed<Prefixed>()); break;
-        case 0x07: ValWrapper<&Z80::Rlc, Prefixed>(reg.a); break;
+        // RLC
+        case 0x00: case 0x01: case 0x02: case 0x03: case 0x04: case 0x05: case 0x07:
+            ValWrapper<&Z80::Rlc, Prefixed>(src); break;
+        case 0x06:
+            PtrWrapper<&Z80::Rlc>(Indexed<Prefixed>()); break;
 
-        case 0x10: ValWrapper<&Z80::Rl, Prefixed>(reg.b); break;
-        case 0x11: ValWrapper<&Z80::Rl, Prefixed>(reg.c); break;
-        case 0x12: ValWrapper<&Z80::Rl, Prefixed>(reg.d); break;
-        case 0x13: ValWrapper<&Z80::Rl, Prefixed>(reg.e); break;
-        case 0x14: ValWrapper<&Z80::Rl, Prefixed>(reg.h); break;
-        case 0x15: ValWrapper<&Z80::Rl, Prefixed>(reg.l); break;
-        case 0x16: PtrWrapper<&Z80::Rl>(Indexed<Prefixed>()); break;
-        case 0x17: ValWrapper<&Z80::Rl, Prefixed>(reg.a); break;
+        // RL
+        case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x17:
+            ValWrapper<&Z80::Rl, Prefixed>(src); break;
+        case 0x16:
+            PtrWrapper<&Z80::Rl>(Indexed<Prefixed>()); break;
 
-        case 0x20: ValWrapper<&Z80::Sla, Prefixed>(reg.b); break;
-        case 0x21: ValWrapper<&Z80::Sla, Prefixed>(reg.c); break;
-        case 0x22: ValWrapper<&Z80::Sla, Prefixed>(reg.d); break;
-        case 0x23: ValWrapper<&Z80::Sla, Prefixed>(reg.e); break;
-        case 0x24: ValWrapper<&Z80::Sla, Prefixed>(reg.h); break;
-        case 0x25: ValWrapper<&Z80::Sla, Prefixed>(reg.l); break;
-        case 0x26: PtrWrapper<&Z80::Sla>(Indexed<Prefixed>()); break;
-        case 0x27: ValWrapper<&Z80::Sla, Prefixed>(reg.a); break;
+        // SLA
+        case 0x20: case 0x21: case 0x22: case 0x23: case 0x24: case 0x25: case 0x27:
+            ValWrapper<&Z80::Sla, Prefixed>(src); break;
+        case 0x26:
+            PtrWrapper<&Z80::Sla>(Indexed<Prefixed>()); break;
 
-        case 0x30: ValWrapper<&Z80::Sll, Prefixed>(reg.b); break;
-        case 0x31: ValWrapper<&Z80::Sll, Prefixed>(reg.c); break;
-        case 0x32: ValWrapper<&Z80::Sll, Prefixed>(reg.d); break;
-        case 0x33: ValWrapper<&Z80::Sll, Prefixed>(reg.e); break;
-        case 0x34: ValWrapper<&Z80::Sll, Prefixed>(reg.h); break;
-        case 0x35: ValWrapper<&Z80::Sll, Prefixed>(reg.l); break;
-        case 0x36: PtrWrapper<&Z80::Sll>(Indexed<Prefixed>()); break;
-        case 0x37: ValWrapper<&Z80::Sll, Prefixed>(reg.a); break;
+        // SLL
+        case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x37:
+            ValWrapper<&Z80::Sll, Prefixed>(src); break;
+        case 0x36:
+            PtrWrapper<&Z80::Sll>(Indexed<Prefixed>()); break;
 
-        case 0x08: ValWrapper<&Z80::Rrc, Prefixed>(reg.b); break;
-        case 0x09: ValWrapper<&Z80::Rrc, Prefixed>(reg.c); break;
-        case 0x0A: ValWrapper<&Z80::Rrc, Prefixed>(reg.d); break;
-        case 0x0B: ValWrapper<&Z80::Rrc, Prefixed>(reg.e); break;
-        case 0x0C: ValWrapper<&Z80::Rrc, Prefixed>(reg.h); break;
-        case 0x0D: ValWrapper<&Z80::Rrc, Prefixed>(reg.l); break;
-        case 0x0E: PtrWrapper<&Z80::Rrc>(Indexed<Prefixed>()); break;
-        case 0x0F: ValWrapper<&Z80::Rrc, Prefixed>(reg.a); break;
+        // RRC
+        case 0x08: case 0x09: case 0x0A: case 0x0B: case 0x0C: case 0x0D: case 0x0F:
+            ValWrapper<&Z80::Rrc, Prefixed>(src); break;
+        case 0x0E:
+            PtrWrapper<&Z80::Rrc>(Indexed<Prefixed>()); break;
 
-        case 0x18: ValWrapper<&Z80::Rr, Prefixed>(reg.b); break;
-        case 0x19: ValWrapper<&Z80::Rr, Prefixed>(reg.c); break;
-        case 0x1A: ValWrapper<&Z80::Rr, Prefixed>(reg.d); break;
-        case 0x1B: ValWrapper<&Z80::Rr, Prefixed>(reg.e); break;
-        case 0x1C: ValWrapper<&Z80::Rr, Prefixed>(reg.h); break;
-        case 0x1D: ValWrapper<&Z80::Rr, Prefixed>(reg.l); break;
-        case 0x1E: PtrWrapper<&Z80::Rr>(Indexed<Prefixed>()); break;
-        case 0x1F: ValWrapper<&Z80::Rr, Prefixed>(reg.a); break;
+        // RR
+        case 0x18: case 0x19: case 0x1A: case 0x1B: case 0x1C: case 0x1D: case 0x1F:
+            ValWrapper<&Z80::Rr, Prefixed>(src); break;
+        case 0x1E:
+            PtrWrapper<&Z80::Rr>(Indexed<Prefixed>()); break;
 
-        case 0x28: ValWrapper<&Z80::Sra, Prefixed>(reg.b); break;
-        case 0x29: ValWrapper<&Z80::Sra, Prefixed>(reg.c); break;
-        case 0x2A: ValWrapper<&Z80::Sra, Prefixed>(reg.d); break;
-        case 0x2B: ValWrapper<&Z80::Sra, Prefixed>(reg.e); break;
-        case 0x2C: ValWrapper<&Z80::Sra, Prefixed>(reg.h); break;
-        case 0x2D: ValWrapper<&Z80::Sra, Prefixed>(reg.l); break;
-        case 0x2E: PtrWrapper<&Z80::Sra>(Indexed<Prefixed>()); break;
-        case 0x2F: ValWrapper<&Z80::Sra, Prefixed>(reg.a); break;
+        // SRA
+        case 0x28: case 0x29: case 0x2A: case 0x2B: case 0x2C: case 0x2D: case 0x2F:
+            ValWrapper<&Z80::Sra, Prefixed>(src); break;
+        case 0x2E:
+            PtrWrapper<&Z80::Sra>(Indexed<Prefixed>()); break;
 
-        case 0x38: ValWrapper<&Z80::Srl, Prefixed>(reg.b); break;
-        case 0x39: ValWrapper<&Z80::Srl, Prefixed>(reg.c); break;
-        case 0x3A: ValWrapper<&Z80::Srl, Prefixed>(reg.d); break;
-        case 0x3B: ValWrapper<&Z80::Srl, Prefixed>(reg.e); break;
-        case 0x3C: ValWrapper<&Z80::Srl, Prefixed>(reg.h); break;
-        case 0x3D: ValWrapper<&Z80::Srl, Prefixed>(reg.l); break;
-        case 0x3E: PtrWrapper<&Z80::Srl>(Indexed<Prefixed>()); break;
-        case 0x3F: ValWrapper<&Z80::Srl, Prefixed>(reg.a); break;
+        // SRL
+        case 0x38: case 0x39: case 0x3A: case 0x3B: case 0x3C: case 0x3D: case 0x3F:
+            ValWrapper<&Z80::Srl, Prefixed>(src); break;
+        case 0x3E:
+            PtrWrapper<&Z80::Srl>(Indexed<Prefixed>()); break;
 
         default: NotYetImplemented(opcode); break;
     }

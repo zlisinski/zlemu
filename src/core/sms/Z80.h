@@ -94,6 +94,8 @@ public:
     void ProcessOpcode();
 
 protected:
+    enum class IndexType {HL, IX, IY};
+
     void NotYetImplemented(uint8_t opcode) const;
 
     uint8_t ReadPC8();
@@ -102,6 +104,14 @@ protected:
 
     void ReadImm8();
     void ReadImm16();
+
+    uint8_t &GetSrcReg8(uint8_t opcode);
+    uint8_t &GetDestReg8(uint8_t opcode);
+    uint8_t &GetSrcReg8Unindexed(uint8_t opcode);
+    uint8_t &GetDestReg8Unindexed(uint8_t opcode);
+    uint16_t &GetReg16(uint8_t opcode);
+    uint16_t &GetReg16Stack(uint8_t opcode);
+    void SetIndexType(IndexType type);
 
     uint8_t PtrRead8(uint16_t addr);
     uint16_t PtrRead16(uint16_t addr);
@@ -168,9 +178,15 @@ protected:
     void ProcessOpcodeCB();
 
     Registers reg;
+
+    IndexType indexType = IndexType::HL;
     uint16_t *index = &reg.hl;
     uint8_t *indexH = &reg.h;
     uint8_t *indexL = &reg.l;
+    uint8_t *regTable8[8] = {&reg.b, &reg.c, &reg.d, &reg.e, &reg.h, &reg.l, nullptr, &reg.a};
+    uint8_t *regTableUnindexed8[8] = {&reg.b, &reg.c, &reg.d, &reg.e, &reg.h, &reg.l, nullptr, &reg.a};
+    uint16_t *regTable16[4] = {&reg.bc, &reg.de, &reg.hl, &reg.sp};
+    uint16_t *regTable16Stack[4] = {&reg.bc, &reg.de, &reg.hl, &reg.af};
 
     union
     {
