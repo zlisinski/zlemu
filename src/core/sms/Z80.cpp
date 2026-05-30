@@ -50,10 +50,13 @@ inline void Z80::ReadImm8()
 }
 
 
+template <bool WriteWZ>
 inline void Z80::ReadImm16()
 {
     ReadImm8();
     ReadImm8();
+    if constexpr (WriteWZ)
+        reg.wz = operandWord;
 }
 
 
@@ -117,29 +120,37 @@ inline void Z80::SetIndexType(IndexType type)
 }
 
 
+template <bool WriteWZ>
 inline uint8_t Z80::PtrRead8(uint16_t addr)
 {
+    if constexpr (WriteWZ)
+        reg.wz = addr + 1;
     return memory->ReadByte(addr);
 }
 
 
 inline uint16_t Z80::PtrRead16(uint16_t addr)
 {
-    return memory->ReadWord(addr);
+    uint8_t low = PtrRead8(addr);
+    reg.wz++;
+    uint8_t high = PtrRead8(addr+1);
+    return Bytes::Make16Bit(high, low);
 }
 
 
 template <bool PrefixedCB>
 inline uint16_t Z80::Indexed()
 {
-    if (index == &reg.hl)
+    if (indexType == IndexType::HL)
         return *index;
 
     // Prefixed CB instructions already read the displacement.
     if constexpr (!PrefixedCB)
         ReadImm8();
 
-    return *index + static_cast<int8_t>(operand[0]);
+    reg.wz = *index + static_cast<int8_t>(operand[0]);
+
+    return reg.wz;
 }
 
 
@@ -222,14 +233,21 @@ inline void Z80::LoadRegister16(uint16_t &dest, uint16_t src)
 }
 
 
+template <bool WriteWZ>
 inline void Z80::LoadPointer8(uint16_t destAddr, uint8_t src)
 {
+    if constexpr (WriteWZ)
+    {
+        reg.z = (destAddr + 1) & 0xFF;
+        reg.w = src;
+    }
     memory->WriteByte(destAddr, src);
 }
 
 
 inline void Z80::LoadPointer16(uint16_t destAddr, uint16_t src)
 {
+    reg.wz++;
     memory->WriteWord(destAddr, src);
 }
 
@@ -269,6 +287,7 @@ inline void Z80::BlockLoad(bool loop)
     if (reg.bc && loop)
     {
         reg.pc -= 2;
+        reg.wz = reg.pc + 1;
         SetXYFlags(reg.pc >> 8);
     }
 }
@@ -291,6 +310,7 @@ inline void Z80::BlockCompare(bool loop)
     if (reg.bc && !reg.flags.z && loop)
     {
         reg.pc -= 2;
+        reg.wz = reg.pc + 1;
         SetXYFlags(reg.pc >> 8);
     }
 }
@@ -320,6 +340,8 @@ inline void Z80::Add16(uint16_t &dest, uint16_t value)
     reg.flags.h = HalfCarry(dest, value, result);
     SetXYFlags(result >> 8);
 
+    reg.wz = dest + 1;
+
     dest = result;
 }
 
@@ -334,6 +356,8 @@ inline void Z80::Adc16(uint16_t &dest, uint16_t value)
     reg.flags.h = HalfCarry(dest, value, result);
     SetXYFlags(result >> 8);
     SetZSFlags((uint16_t)result);
+
+    reg.wz = dest + 1;
 
     dest = result;
 }
@@ -364,6 +388,8 @@ void Z80::Sbc16(uint16_t &dest, uint16_t value)
     reg.flags.h = HalfCarry(dest, value, result);
     SetXYFlags(result >> 8);
     SetZSFlags((uint16_t)result);
+
+    reg.wz = dest + 1;
 
     dest = result;
 }
@@ -723,25 +749,25 @@ void Z80::ProcessOpcode()
             LoadRegister8(GetDestReg8Unindexed(opcode), PtrRead8(Indexed())); break;
 
         case 0x0A: case 0x1A: // LD A, (rr)
-            LoadRegister8(reg.a, PtrRead8(GetReg16(opcode))); break;
+            LoadRegister8(reg.a, PtrRead8<true>(GetReg16(opcode))); break;
 
         case 0x2A: // LD HL|IX|IY, (nn)
             ReadImm16(); LoadRegister16(*index, PtrRead16(operandWord)); break;
 
         case 0x3A: // LD A, (nn)
-            ReadImm16(); LoadRegister8(reg.a, PtrRead8(operandWord)); break;
+            ReadImm16(); LoadRegister8(reg.a, PtrRead8<true>(operandWord)); break;
 
         case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77: // LD (HL|IX+d|IY+d), r
             LoadPointer8(Indexed(), GetSrcReg8Unindexed(opcode)); break;
 
         case 0x02: case 0x12: // LD (rr), A
-            LoadPointer8(GetReg16(opcode), reg.a); break;
+            LoadPointer8<true>(GetReg16(opcode), reg.a); break;
 
         case 0x22: // LD (nn), HL|IX|IY
             ReadImm16(); LoadPointer16(operandWord, *index); break;
 
         case 0x32: // LD (nn), A
-            ReadImm16(); LoadPointer8(operandWord, reg.a); break;
+            ReadImm16(); LoadPointer8<true>(operandWord, reg.a); break;
 
         case 0x36: // LD (HL|IX+d|IY+d), n
         {
@@ -752,7 +778,7 @@ void Z80::ProcessOpcode()
         }
 
         case 0x01: case 0x11: case 0x21: case 0x31: // LD rr, nn
-            ReadImm16(); LoadRegister16(GetReg16(opcode), operandWord); break;
+            ReadImm16<false>(); LoadRegister16(GetReg16(opcode), operandWord); break;
 
         case 0xF9: // LD SP, HL|IX|IY
             LoadRegister16(reg.sp, *index); break;
@@ -787,6 +813,7 @@ void Z80::ProcessOpcode()
         {
             uint16_t old = *index;
             *index = memory->ReadWord(reg.sp);
+            reg.wz = *index;
             memory->WriteWord(reg.sp, old);
             break;
         }
@@ -912,14 +939,22 @@ void Z80::ProcessOpcodeED()
         /// Block Transfer
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0xA0: BlockLoad(false); reg.de++; reg.hl++; break;
-        case 0xB0: BlockLoad(true); reg.de++; reg.hl++; break;
-        case 0xA8: BlockLoad(false); reg.de--; reg.hl--; break;
-        case 0xB8: BlockLoad(true); reg.de--; reg.hl--; break;
-        case 0xA1: BlockCompare(false); reg.hl++; break;
-        case 0xB1: BlockCompare(true); reg.hl++; break;
-        case 0xA9: BlockCompare(false); reg.hl--; break;
-        case 0xB9: BlockCompare(true); reg.hl--; break;
+        case 0xA0: // LDI
+            BlockLoad(false); reg.de++; reg.hl++; break;
+        case 0xB0: // LDI
+            BlockLoad(true); reg.de++; reg.hl++; break;
+        case 0xA8: // LDD
+            BlockLoad(false); reg.de--; reg.hl--; break;
+        case 0xB8: // LDDR
+            BlockLoad(true); reg.de--; reg.hl--; break;
+        case 0xA1: // CPI
+            reg.wz++; BlockCompare(false); reg.hl++; break;
+        case 0xB1: // CPIR
+            reg.wz++; BlockCompare(true); reg.hl++; break;
+        case 0xA9: // CPD
+            reg.wz--; BlockCompare(false); reg.hl--; break;
+        case 0xB9: // CPDR
+            reg.wz--; BlockCompare(true); reg.hl--; break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Arithmetic

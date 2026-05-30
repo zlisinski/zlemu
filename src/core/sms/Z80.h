@@ -67,6 +67,7 @@ struct Registers
     PAIR(hl, h, l);
     PAIR(ix, ixh, ixl);
     PAIR(iy, iyh, iyl);
+    PAIR(wz, w, z);
 
 #undef PAIR
 #pragma GCC diagnostic pop
@@ -103,6 +104,7 @@ protected:
     uint8_t FetchOpcode();
 
     void ReadImm8();
+    template <bool WriteWZ = true>
     void ReadImm16();
 
     uint8_t &GetSrcReg8(uint8_t opcode);
@@ -113,6 +115,7 @@ protected:
     uint16_t &GetReg16Stack(uint8_t opcode);
     void SetIndexType(IndexType type);
 
+    template <bool WriteWZ = false>
     uint8_t PtrRead8(uint16_t addr);
     uint16_t PtrRead16(uint16_t addr);
     template <bool PrefixedCB = false>
@@ -133,6 +136,7 @@ protected:
 
     void LoadRegister8(uint8_t &dest, uint8_t src);
     void LoadRegister16(uint16_t &dest, uint16_t src);
+    template <bool WriteWZ = false>
     void LoadPointer8(uint16_t destAddr, uint8_t src);
     void LoadPointer16(uint16_t destAddr, uint16_t src);
 

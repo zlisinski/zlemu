@@ -92,7 +92,7 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
         cpu->reg.iy = initial["iy"].toInt();
         cpu->reg.pc = initial["pc"].toInt();
         cpu->reg.sp = initial["sp"].toInt();
-        //cpu->reg.wz = initial["wz"].toInt();
+        cpu->reg.wz = initial["wz"].toInt();
         cpu->iff1 = initial["iff1"].toInt();
         cpu->iff2 = initial["iff2"].toInt();
         //cpu->reg.im = initial["im"].toInt();
@@ -137,7 +137,7 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
         EXPECT_EQ(cpu->reg.iy, final["iy"].toInt()) << testName;
         EXPECT_EQ(cpu->reg.pc, final["pc"].toInt()) << testName;
         EXPECT_EQ(cpu->reg.sp, final["sp"].toInt()) << testName;
-        //EXPECT_EQ(cpu->reg.wz, final["wz"].toInt()) << testName;
+        EXPECT_EQ(cpu->reg.wz, final["wz"].toInt()) << testName;
         EXPECT_EQ(cpu->iff1, final["iff1"].toInt()) << testName;
         EXPECT_EQ(cpu->iff2, final["iff2"].toInt()) << testName;
         //EXPECT_EQ(cpu->reg.im, final["im"].toInt()) << testName;
@@ -206,7 +206,7 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\tiy: 0x%1\n").arg(initial["iy"].toInt(), 4, 16, QChar('0'));
     str += QStringLiteral("\tpc: 0x%1\n").arg(initial["pc"].toInt(), 4, 16, QChar('0'));
     str += QStringLiteral("\tsp: 0x%1\n").arg(initial["sp"].toInt(), 4, 16, QChar('0'));
-    //str += QStringLiteral("\twz: 0x%1\n").arg(initial["wz"].toInt(), 4, 16, QChar('0'));
+    str += QStringLiteral("\twz: 0x%1\n").arg(initial["wz"].toInt(), 4, 16, QChar('0'));
     str += QStringLiteral("\tiff1: 0x%1\n").arg(initial["iff1"].toInt(), 2, 16, QChar('0'));
     str += QStringLiteral("\tiff2: 0x%1\n").arg(initial["iff2"].toInt(), 2, 16, QChar('0'));
     //str += QStringLiteral("\tim: 0x%1\n").arg(initial["im"].toInt(), 2, 16, QChar('0'));
@@ -255,7 +255,7 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\tiy: 0x%1\n").arg(final["iy"].toInt(), 4, 16, QChar('0'));
     str += QStringLiteral("\tpc: 0x%1\n").arg(final["pc"].toInt(), 4, 16, QChar('0'));
     str += QStringLiteral("\tsp: 0x%1\n").arg(final["sp"].toInt(), 4, 16, QChar('0'));
-    //str += QStringLiteral("\twz: 0x%1\n").arg(final["wz"].toInt(), 4, 16, QChar('0'));
+    str += QStringLiteral("\twz: 0x%1\n").arg(final["wz"].toInt(), 4, 16, QChar('0'));
     str += QStringLiteral("\tiff1: 0x%1\n").arg(final["iff1"].toInt(), 2, 16, QChar('0'));
     str += QStringLiteral("\tiff2: 0x%1\n").arg(final["iff2"].toInt(), 2, 16, QChar('0'));
     //str += QStringLiteral("\tim: 0x%1\n").arg(final["im"].toInt(), 2, 16, QChar('0'));
@@ -303,7 +303,7 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\tiy: 0x%1\n").arg(cpu->reg.iy, 4, 16, QChar('0'));
     str += QStringLiteral("\tpc: 0x%1\n").arg(cpu->reg.pc, 4, 16, QChar('0'));
     str += QStringLiteral("\tsp: 0x%1\n").arg(cpu->reg.sp, 4, 16, QChar('0'));
-    //str += QStringLiteral("\twz: 0x%1\n").arg(cpu->reg.wz, 4, 16, QChar('0'));
+    str += QStringLiteral("\twz: 0x%1\n").arg(cpu->reg.wz, 4, 16, QChar('0'));
     str += QStringLiteral("\tiff1: 0x%1\n").arg(cpu->iff1, 2, 16, QChar('0'));
     str += QStringLiteral("\tiff2: 0x%1\n").arg(cpu->iff2, 2, 16, QChar('0'));
     //str += QStringLiteral("\tim: 0x%1\n").arg(cpu->reg.im, 2, 16, QChar('0'));
