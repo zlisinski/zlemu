@@ -114,6 +114,27 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
             memory->WriteByte(addr, val);
         }
 
+        // Set port initial values.
+        QJsonArray ports = obj["ports"].toArray();
+        for (int j = 0; j < ports.size(); j++)
+        {
+            QJsonArray port = ports[j].toArray();
+
+            // Test data assumes NMOS value, but I'm emulating CMOS.
+            if (opcode == "ED 71" && port[1].toInt() == 0)
+            {
+                port[1] = 255;
+                ports[j] = port;
+            }
+
+            if (port[2].toString() == "r")
+            {
+                uint8_t p = port[0].toInt() & 0xFF;
+                uint8_t v = port[1].toInt() & 0xFF;
+                memory->WritePort(p, v);
+            }
+        }
+
         // Run the opcode.
         cpu->ProcessOpcode();
 
@@ -165,6 +186,18 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
             ASSERT_GE(val, 0) << testName;
             ASSERT_LE(val, 0xFF) << testName;
             EXPECT_EQ(memory->ReadByte(addr), val) << testName;
+        }
+
+        // Verify port write values.
+        for (const QJsonValue &entry : ports)
+        {
+            QJsonArray port = entry.toArray();
+            if (port[2].toString() == "w")
+            {
+                uint8_t p = port[0].toInt() & 0xFF;
+                uint8_t v = port[1].toInt() & 0xFF;
+                EXPECT_EQ(memory->ReadPort(p), v);
+            }
         }
 
         // If there were errors, stop processing this opcode. We don't want 10000 errors.
@@ -368,6 +401,7 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         0xC9, 0xC0, 0xC8, 0xD0, 0xD8, 0xE0, 0xE8, 0xF0, 0xF8,
         0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF,
         0xF3, 0xFB,
+        0xDB, 0xD3,
     };
     for (uint8_t i : implemented)
     {
@@ -383,6 +417,8 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         0x6F, 0x67,
         0x45, 0x4D,
         0x46, 0x4E, 0x56, 0x5E,
+        0x40, 0x48, 0x50, 0x58, 0x60, 0x68, 0x70, 0x78, 0xA2, 0xAA, 0xB2, 0xBA,
+        0x41, 0x49, 0x51, 0x59, 0x61, 0x69, 0x71, 0x79, 0xA3, 0xAB, 0xB3, 0xBB,
     };
     for (uint8_t i : implementedED)
         info.push_back(TestOpcodeTableED[i]);

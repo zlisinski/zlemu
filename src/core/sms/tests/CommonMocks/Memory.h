@@ -32,6 +32,10 @@ public:
         WriteByte(addr + 1, Bytes::GetByte<1>(value));
     }
 
+    uint8_t ReadPort(uint8_t port) const;
+
+    void WritePort(uint8_t port, uint8_t value);
+
     void ClearMemory()
     {
         memory.fill(0);
@@ -39,6 +43,7 @@ public:
 
 protected:
     std::array<uint8_t, 0x10000> memory = {0};
+    std::array<uint8_t, 0x100> portData = {0};
 };
 
 

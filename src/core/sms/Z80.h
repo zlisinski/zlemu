@@ -1,8 +1,8 @@
 #ifndef ZLEMU_CORE_SMS_Z80_H
 #define ZLEMU_CORE_SMS_Z80_H
 
-#include "../Bytes.h"
-#include "../Zlemu.h"
+
+#include "Zlemu.h"
 #include "Memory.h"
 
 
@@ -110,7 +110,12 @@ public:
 protected:
     enum class IndexType {HL, IX, IY};
 
-    void NotYetImplemented(uint8_t opcode) const;
+    template <bool WriteWZ = false>
+    uint8_t PtrRead8(uint16_t addr);
+    uint16_t PtrRead16(uint16_t addr);
+    void PtrWrite8(uint16_t addr, uint8_t value);
+    uint8_t PortRead(uint8_t port);
+    void PortWrite(uint8_t port, uint8_t value);
 
     uint8_t ReadPC8();
     uint16_t ReadPC16();
@@ -128,11 +133,6 @@ protected:
     uint16_t &GetReg16Stack(uint8_t opcode);
     bool FlagCheck(uint8_t opcode);
     void SetIndexType(IndexType type);
-
-    template <bool WriteWZ = false>
-    uint8_t PtrRead8(uint16_t addr);
-    uint16_t PtrRead16(uint16_t addr);
-    void PtrWrite8(uint16_t addr, uint8_t value);
     template <bool PrefixedCB = false>
     uint16_t Indexed();
 
@@ -145,6 +145,7 @@ protected:
     template <typename T>
     void SetZSFlags(T value);
     void SetIRFlags();
+    void SetIORepeatFlags();
     bool GetParity(uint8_t value) const;
     template <typename T>
     bool HalfCarry(T op1, T op2, int result) const;
@@ -158,8 +159,10 @@ protected:
     void Push(uint16_t value);
     void Pop(uint16_t &dest);
 
-    void BlockLoad(bool loop);
-    void BlockCompare(bool loop);
+    template <bool Increment, bool Repeat>
+    void BlockLoad();
+    template <bool Increment, bool Repeat>
+    void BlockCompare();
 
     void Add8(uint8_t value, bool carry = false);
     void Add16(uint16_t &dest, uint16_t value);
@@ -206,9 +209,20 @@ protected:
 
     void Jr(bool condition);
 
+    void In(uint8_t &dest, uint8_t port);
+    void InImm(uint8_t port);
+    template <bool Increment, bool Repeat>
+    void InInd(uint8_t port);
+    void Out(uint8_t src, uint8_t port);
+    void OutImm(uint8_t port);
+    template <bool Increment, bool Repeat>
+    void OutInd(uint8_t port);
+
     void ProcessOpcodeED();
     template <bool Prefixed>
     void ProcessOpcodeCB();
+
+    void NotYetImplemented(uint8_t opcode) const;
 
     Registers reg;
 

@@ -21,6 +21,42 @@ void Z80::Reset()
 }
 
 
+template <bool WriteWZ>
+inline uint8_t Z80::PtrRead8(uint16_t addr)
+{
+    if constexpr (WriteWZ)
+        reg.wz = addr + 1;
+    return memory->ReadByte(addr);
+}
+
+
+inline uint16_t Z80::PtrRead16(uint16_t addr)
+{
+    uint8_t low = PtrRead8(addr);
+    reg.wz++;
+    uint8_t high = PtrRead8(addr+1);
+    return Bytes::Make16Bit(high, low);
+}
+
+
+inline void Z80::PtrWrite8(uint16_t addr, uint8_t value)
+{
+    memory->WriteByte(addr, value);
+}
+
+
+inline uint8_t Z80::PortRead(uint8_t port)
+{
+    return memory->ReadPort(port);
+}
+
+
+inline void Z80::PortWrite(uint8_t port, uint8_t value)
+{
+    memory->WritePort(port, value);
+}
+
+
 inline uint8_t Z80::ReadPC8()
 {
     uint8_t byte = memory->ReadByte(reg.pc++);
@@ -130,31 +166,6 @@ inline void Z80::SetIndexType(IndexType type)
 }
 
 
-template <bool WriteWZ>
-inline uint8_t Z80::PtrRead8(uint16_t addr)
-{
-    if constexpr (WriteWZ)
-        reg.wz = addr + 1;
-    return memory->ReadByte(addr);
-}
-
-
-inline uint16_t Z80::PtrRead16(uint16_t addr)
-{
-    uint8_t low = PtrRead8(addr);
-    reg.wz++;
-    uint8_t high = PtrRead8(addr+1);
-    return Bytes::Make16Bit(high, low);
-}
-
-
-inline void Z80::PtrWrite8(uint16_t addr, uint8_t value)
-{
-    memory->WriteByte(addr, value);
-}
-
-
-
 template <bool PrefixedCB>
 inline uint16_t Z80::Indexed()
 {
@@ -218,6 +229,28 @@ inline void Z80::SetIRFlags()
     reg.flags.h = 0;
     SetXYFlags(reg.a);
     SetZSFlags(reg.a);
+}
+
+
+inline void Z80::SetIORepeatFlags()
+{
+    if (reg.flags.c)
+    {
+        if (reg.flags.n)
+        {
+            reg.flags.p = reg.flags.p == GetParity((reg.b - 1) & 0x07);
+            reg.flags.h = (reg.b & 0x0F) == 0;
+        }
+        else
+        {
+            reg.flags.p = reg.flags.p == GetParity((reg.b + 1) & 0x07);
+            reg.flags.h = (reg.b & 0x0F) == 0x0F;
+        }
+    }
+    else
+    {
+        reg.flags.p = reg.flags.p == GetParity(reg.b & 0x07);
+    }
 }
 
 
@@ -287,12 +320,23 @@ inline void Z80::Pop(uint16_t &dest)
 }
 
 
-inline void Z80::BlockLoad(bool loop)
+template <bool Increment, bool Repeat>
+inline void Z80::BlockLoad()
 {
     uint8_t byte = memory->ReadByte(reg.hl);
     memory->WriteByte(reg.de, byte);
 
     reg.bc--;
+    if constexpr (Increment)
+    {
+        reg.de++;
+        reg.hl++;
+    }
+    else
+    {
+        reg.de--;
+        reg.hl--;
+    }
 
     reg.flags.n = 0;
     reg.flags.p = reg.bc != 0;
@@ -300,7 +344,7 @@ inline void Z80::BlockLoad(bool loop)
     reg.flags.h = 0;
     reg.flags.y = Bytes::TestBit<1>(reg.a + byte);
 
-    if (reg.bc && loop)
+    if (reg.bc && Repeat)
     {
         reg.pc -= 2;
         reg.wz = reg.pc + 1;
@@ -309,12 +353,17 @@ inline void Z80::BlockLoad(bool loop)
 }
 
 
-inline void Z80::BlockCompare(bool loop)
+template <bool Increment, bool Repeat>
+inline void Z80::BlockCompare()
 {
     uint8_t byte = memory->ReadByte(reg.hl);
     uint8_t result = reg.a - byte;
 
     reg.bc--;
+    if constexpr (Increment)
+        reg.hl++;
+    else
+        reg.hl--;
 
     reg.flags.n = 1;
     reg.flags.p = reg.bc != 0;
@@ -323,7 +372,7 @@ inline void Z80::BlockCompare(bool loop)
     reg.flags.y = Bytes::TestBit<1>(result - reg.flags.h);
     SetZSFlags(result);
 
-    if (reg.bc && !reg.flags.z && loop)
+    if (Repeat && reg.bc && !reg.flags.z)
     {
         reg.pc -= 2;
         reg.wz = reg.pc + 1;
@@ -845,6 +894,120 @@ inline void Z80::Jr(bool condition)
 }
 
 
+inline void Z80::In(uint8_t &dest, uint8_t port)
+{
+    reg.wz = reg.bc + 1;
+    dest = PortRead(port);
+
+    reg.flags.n = 0;
+    reg.flags.p = GetParity(dest);
+    reg.flags.h = 0;
+    SetXYFlags(dest);
+    SetZSFlags(dest);
+}
+
+
+inline void Z80::InImm(uint8_t port)
+{
+    reg.w = reg.a;
+    reg.z = port;
+    reg.wz++;
+    reg.a = PortRead(port);
+}
+
+
+template <bool Increment, bool Repeat>
+void Z80::InInd(uint8_t port)
+{
+    uint8_t value = PortRead(port);
+    PtrWrite8(reg.hl, value);
+
+    uint16_t check = value;
+    if constexpr (Increment)
+    {
+        reg.wz = reg.bc + 1;
+        reg.hl++;
+        check += (reg.c + 1) & 0xFF;
+    }
+    else
+    {
+        reg.wz = reg.bc - 1;
+        reg.hl--;
+        check += (reg.c - 1) & 0xFF;
+    }
+
+    reg.b--;
+
+    reg.flags.c = check > 255;
+    reg.flags.n = Bytes::TestBit<7>(value);
+    reg.flags.p = GetParity((check & 0x07) ^ reg.b);
+    reg.flags.h = reg.flags.c;
+    SetXYFlags(reg.b);
+    SetZSFlags(reg.b);
+
+    if (Repeat && reg.b)
+    {
+        reg.pc -= 2;
+        reg.wz = reg.pc + 1;
+        SetXYFlags(reg.pc >> 8);
+        SetIORepeatFlags();
+    }
+}
+
+
+inline void Z80::Out(uint8_t src, uint8_t port)
+{
+    reg.wz = reg.bc + 1;
+    PortWrite(port, src);
+}
+
+
+inline void Z80::OutImm(uint8_t port)
+{
+    reg.w = reg.a;
+    reg.z = port;
+    PortWrite(port, reg.a);
+    reg.z++;
+}
+
+
+template <bool Increment, bool Repeat>
+void Z80::OutInd(uint8_t port)
+{
+    uint8_t value = PtrRead8(reg.hl);
+    PortWrite(port, value);
+
+    reg.b--;
+
+    if constexpr (Increment)
+    {
+        reg.wz = reg.bc + 1;
+        reg.hl++;
+    }
+    else
+    {
+        reg.wz = reg.bc - 1;
+        reg.hl--;
+    }
+
+    uint16_t check = value + reg.l;
+    reg.flags.c = check > 255;
+    reg.flags.n = Bytes::TestBit<7>(value);
+    reg.flags.p = GetParity((check & 0x07) ^ reg.b);
+    reg.flags.h = reg.flags.c;
+    SetXYFlags(reg.b);
+    SetZSFlags(reg.b);
+
+    if (Repeat && reg.b)
+    {
+        reg.pc -= 2;
+        reg.wz = reg.pc + 1;
+        SetXYFlags(reg.pc >> 8);
+        SetIORepeatFlags();
+    }
+}
+
+
 void Z80::ProcessOpcode()
 {
     uint8_t opcode = FetchOpcode();
@@ -1148,6 +1311,15 @@ void Z80::ProcessOpcode()
         case 0xFB: // EI
             iff1 = iff2 = true; break;
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// IO
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0xDB: // IN A, (n)
+            ReadImm8(); InImm(operand[0]); break;
+        case 0xD3: // OUT (n), A
+            ReadImm8(); OutImm(operand[0]); break;
+
         default: NotYetImplemented(opcode); break;
     }
 }
@@ -1181,21 +1353,21 @@ void Z80::ProcessOpcodeED()
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         case 0xA0: // LDI
-            BlockLoad(false); reg.de++; reg.hl++; break;
+            BlockLoad<true, false>(); break;
         case 0xB0: // LDI
-            BlockLoad(true); reg.de++; reg.hl++; break;
+            BlockLoad<true, true>(); break;
         case 0xA8: // LDD
-            BlockLoad(false); reg.de--; reg.hl--; break;
+            BlockLoad<false, false>(); break;
         case 0xB8: // LDDR
-            BlockLoad(true); reg.de--; reg.hl--; break;
+            BlockLoad<false, true>(); break;
         case 0xA1: // CPI
-            reg.wz++; BlockCompare(false); reg.hl++; break;
+            reg.wz++; BlockCompare<true, false>(); break;
         case 0xB1: // CPIR
-            reg.wz++; BlockCompare(true); reg.hl++; break;
+            reg.wz++; BlockCompare<true, true>(); break;
         case 0xA9: // CPD
-            reg.wz--; BlockCompare(false); reg.hl--; break;
+            reg.wz--; BlockCompare<false, false>(); break;
         case 0xB9: // CPDR
-            reg.wz--; BlockCompare(true); reg.hl--; break;
+            reg.wz--; BlockCompare<false, true>(); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Arithmetic
@@ -1236,6 +1408,40 @@ void Z80::ProcessOpcodeED()
             im = 1; break;
         case 0x5E: // IM 2
             im = 2; break;
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// IO
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0x40: case 0x48: case 0x50: case 0x58: case 0x60: case 0x68: case 0x78: // IN r, (C)
+            In(GetDestReg8(opcode), reg.c); break;
+        case 0x70: // IN HL, (C)
+        {
+            uint8_t dummy;
+            In(dummy, reg.c);
+            break;
+        }
+        case 0xA2: // INI
+            InInd<true, false>(reg.c); break;
+        case 0xB2: // INIR
+            InInd<true, true>(reg.c); break;
+        case 0xAA: // IND
+            InInd<false, false>(reg.c); break;
+        case 0xBA: // INDR
+            InInd<false, true>(reg.c); break;
+
+        case 0x41: case 0x49: case 0x51: case 0x59: case 0x61: case 0x69: case 0x79: // OUT (C), r
+            Out(GetDestReg8(opcode), reg.c); break;
+        case 0x71: // OUT (C), HL
+            Out(0xFF, reg.c); break;
+        case 0xA3: // OUTI
+            OutInd<true, false>(reg.c); break;
+        case 0xB3: // OTIR
+            OutInd<true, true>(reg.c); break;
+        case 0xAB: // OUTD
+            OutInd<false, false>(reg.c); break;
+        case 0xBB: // OTDR
+            OutInd<false, true>(reg.c); break;
 
         default: NotYetImplemented(opcode); break;
     }

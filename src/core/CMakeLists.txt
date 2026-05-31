@@ -1,5 +1,9 @@
 find_package(Threads REQUIRED)
 
+include_directories(
+    ./
+)
+
 set(CORE_SRC
     Emulator.cpp
     Utils.cpp
