@@ -118,6 +118,7 @@ protected:
     template <bool WriteWZ = false>
     uint8_t PtrRead8(uint16_t addr);
     uint16_t PtrRead16(uint16_t addr);
+    void PtrWrite8(uint16_t addr, uint8_t value);
     template <bool PrefixedCB = false>
     uint16_t Indexed();
 
@@ -157,6 +158,10 @@ protected:
     void Dec8(uint8_t &dest);
     void DecPtr8(uint16_t destAddr);
     void Dec16(uint16_t &dest);
+    void Cpl();
+    void Neg();
+    void Ccf();
+    void Scf();
 
     void And(uint8_t value);
     void Or(uint8_t value);

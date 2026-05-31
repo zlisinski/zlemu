@@ -139,6 +139,13 @@ inline uint16_t Z80::PtrRead16(uint16_t addr)
 }
 
 
+inline void Z80::PtrWrite8(uint16_t addr, uint8_t value)
+{
+    memory->WriteByte(addr, value);
+}
+
+
+
 template <bool PrefixedCB>
 inline uint16_t Z80::Indexed()
 {
@@ -163,7 +170,7 @@ inline void Z80::ValWrapper(uint8_t &r, auto&&... args)
         uint16_t addr = Indexed<PrefixedCB>();
         r = PtrRead8(addr);
         r = std::invoke(Func, this, r, std::forward<decltype(args)>(args)...);
-        LoadPointer8(addr, r);
+        PtrWrite8(addr, r);
     }
     else
     {
@@ -176,7 +183,7 @@ inline void Z80::PtrWrapper(uint16_t addr, auto&&... args)
 {
     uint8_t value = PtrRead8(addr);
     value = std::invoke(Func, this, value, std::forward<decltype(args)>(args)...);
-    LoadPointer8(addr, value);
+    PtrWrite8(addr, value);
 }
 
 
@@ -462,6 +469,49 @@ inline void Z80::DecPtr8(uint16_t destAddr)
 inline void Z80::Dec16(uint16_t &dest)
 {
     dest--;
+}
+
+
+inline void Z80::Cpl()
+{
+    reg.a = ~reg.a;
+
+    reg.flags.n = 1;
+    reg.flags.h = 1;
+    SetXYFlags(reg.a);
+}
+
+
+inline void Z80::Neg()
+{
+    uint8_t result = ~reg.a + 1;
+
+    reg.flags.c = !!reg.a;
+    reg.flags.n = 1;
+    reg.flags.p = reg.a == 0x80;
+    reg.flags.h = HalfCarry(reg.a, (uint8_t)0, result);
+    SetXYFlags(result);
+    SetZSFlags(result);
+
+    reg.a = result;
+}
+
+
+inline void Z80::Ccf()
+{
+    reg.flags.n = 0;
+    reg.flags.h = reg.flags.c;
+    reg.flags.c = !reg.flags.c;
+    SetXYFlags(reg.a | reg.f);
+}
+
+
+inline void Z80::Scf()
+{
+    reg.flags.n = 0;
+    reg.flags.h = 0;
+    reg.flags.c = 1;
+    SetXYFlags(reg.a | reg.f);
 }
 
 
@@ -793,6 +843,9 @@ void Z80::ProcessOpcode()
 
     switch (opcode)
     {
+        case 0x00: // NOP
+            break;
+
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Loads
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -930,6 +983,15 @@ void Z80::ProcessOpcode()
         case 0x0B: case 0x1B: case 0x2B: case 0x3B: // DEC rr
             Dec16(GetReg16(opcode)); break;
 
+        case 0x2F: // CPL
+            Cpl(); break;
+
+        case 0x3F: // CCF
+            Ccf(); break;
+
+        case 0x37: // SCF
+            Scf(); break;
+
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Logic
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1029,6 +1091,9 @@ void Z80::ProcessOpcodeED()
 
         case 0x42: case 0x52: case 0x62: case 0x72: // SBC HL, rr
             Sbc16(reg.hl, GetReg16(opcode)); break;
+
+        case 0x44: // NEG
+            Neg(); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Rotate & Shift
