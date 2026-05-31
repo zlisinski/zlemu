@@ -10,7 +10,20 @@ namespace Sms
 {
 
 
-enum EFlagMask
+enum EFlagBit
+{
+    CF = 0,
+    NF = 1,
+    PF = 2,
+    VF = 2,
+    XF = 3,
+    HF = 4,
+    YF = 5,
+    ZF = 6,
+    SF = 7
+};
+
+/*enum EFlagMask
 {
     CF = 0x01,
     NF = 0x02,
@@ -21,7 +34,7 @@ enum EFlagMask
     YF = 0x20,
     ZF = 0x40,
     SF = 0x80
-};
+};*/
 
 
 struct Registers
@@ -113,6 +126,7 @@ protected:
     uint8_t &GetDestReg8Unindexed(uint8_t opcode);
     uint16_t &GetReg16(uint8_t opcode);
     uint16_t &GetReg16Stack(uint8_t opcode);
+    bool FlagCheck(uint8_t opcode);
     void SetIndexType(IndexType type);
 
     template <bool WriteWZ = false>
@@ -189,6 +203,8 @@ protected:
     uint8_t ResBit(uint8_t value, uint8_t bit);
     uint8_t SetBit(uint8_t value, uint8_t bit);
 
+    void Jr(bool condition);
+
     void ProcessOpcodeED();
     template <bool Prefixed>
     void ProcessOpcodeCB();
@@ -213,6 +229,7 @@ protected:
 
     bool iff1 = false;
     bool iff2 = false;
+    uint8_t im = 0;
 
     Memory *memory = nullptr;
 };

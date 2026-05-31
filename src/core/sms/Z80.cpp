@@ -97,6 +97,15 @@ inline uint16_t &Z80::GetReg16Stack(uint8_t opcode)
 }
 
 
+inline bool Z80::FlagCheck(uint8_t opcode)
+{
+    uint8_t shiftTable[] = {ZF, CF, PF, SF};
+    uint8_t shift = shiftTable[(opcode >> 4) & 0x03];
+
+    return ((reg.f >> shift) & 0x01) == !!(opcode & 0x08);
+}
+
+
 inline void Z80::SetIndexType(IndexType type)
 {
     indexType = type;
@@ -805,6 +814,16 @@ inline uint8_t Z80::SetBit(uint8_t value, uint8_t bit)
 }
 
 
+inline void Z80::Jr(bool condition)
+{
+    if (condition)
+    {
+        reg.pc += (int8_t)operand[0];
+        reg.wz = reg.pc;
+    }
+}
+
+
 void Z80::ProcessOpcode()
 {
     uint8_t opcode = FetchOpcode();
@@ -1033,6 +1052,78 @@ void Z80::ProcessOpcode()
         case 0x0F: RrcA(); break;
         case 0x1F: RrA(); break;
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Jumps
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0xC3: // JP nn
+            ReadImm16(); reg.pc = operandWord; break;
+        case 0xC2: case 0xCA: case 0xD2: case 0xDA: case 0xE2: case 0xEA: case 0xF2: case 0xFA: // JP cc, nn
+        {
+            ReadImm16();
+            if (FlagCheck(opcode))
+                reg.pc = operandWord;
+            break;
+        }
+        case 0xE9: // JP HL|IX|IY
+            reg.pc = *index; break;
+
+        case 0x18: // JR e
+            ReadImm8(); Jr(true); break;
+        case 0x20: case 0x28: // JR Z|NZ
+            ReadImm8(); Jr(reg.flags.z == !!(opcode & 0x08)); break;
+        case 0x30: case 0x38: // JR C|NC
+            ReadImm8(); Jr(reg.flags.c == !!(opcode & 0x08)); break;
+
+        case 0x10: // DJNZ, e
+            ReadImm8(); reg.b--; Jr(reg.b); break;
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Call & Return
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0xCD: // CALL nn
+            ReadImm16(); Push(reg.pc); reg.pc = operandWord; break;
+        case 0xC4: case 0xCC: case 0xD4: case 0xDC: case 0xE4: case 0xEC: case 0xF4: case 0xFC: // CALL cc, nn
+        {
+            ReadImm16();
+            if (FlagCheck(opcode))
+            {
+                Push(reg.pc);
+                reg.pc = operandWord;
+            }
+            break;
+        }
+
+        case 0xC9: // RET
+            Pop(reg.pc); reg.wz = reg.pc; break;
+        case 0xC0: case 0xC8: case 0xD0: case 0xD8: case 0xE0: case 0xE8: case 0xF0: case 0xF8: // RET cc, nn
+        {
+            if (FlagCheck(opcode))
+            {
+                Pop(reg.wz);
+                reg.pc = reg.wz;
+            }
+            break;
+        }
+
+        case 0xC7: case 0xCF: case 0xD7: case 0xDF: case 0xE7: case 0xEF: case 0xF7: case 0xFF: // RST
+        {
+            Push(reg.pc);
+            reg.wz = 0x08 * ((opcode >> 3) & 0x07);
+            reg.pc = reg.wz;
+            break;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Interrupts
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0xF3: // DI
+            iff1 = iff2 = false; break;
+        case 0xFB: // EI
+            iff1 = iff2 = true; break;
+
         default: NotYetImplemented(opcode); break;
     }
 }
@@ -1103,6 +1194,24 @@ void Z80::ProcessOpcodeED()
             Rld(); break;
         case 0x67: // RRD
             Rrd(); break;
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Call & Return
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0x45: case 0x4D: // RETN / RETI
+            Pop(reg.wz); reg.pc = reg.wz; iff1 = iff2; break;
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Interrupts
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        case 0x46: case 0x4E: // IM 0
+            im = 0; break;
+        case 0x56: // IM 1
+            im = 1; break;
+        case 0x5E: // IM 2
+            im = 2; break;
 
         default: NotYetImplemented(opcode); break;
     }
