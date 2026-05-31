@@ -25,8 +25,11 @@ public:
     ~Z80Ex() = default;
 
     using Z80::reg;
+    using Z80::halted;
     using Z80::iff1;
     using Z80::iff2;
+    using Z80::im;
+    using Z80::ei;
 };
 
 
@@ -94,11 +97,11 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
         cpu->reg.iy = initial["iy"].toInt();
         cpu->reg.pc = initial["pc"].toInt();
         cpu->reg.sp = initial["sp"].toInt();
-        //cpu->reg.wz = initial["wz"].toInt();
+        cpu->reg.wz = initial["wz"].toInt();
         cpu->iff1 = initial["iff1"].toInt();
         cpu->iff2 = initial["iff2"].toInt();
-        //cpu->reg.im = initial["im"].toInt();
-        //cpu->reg.ei = initial["ei"].toInt();
+        cpu->im = initial["im"].toInt();
+        cpu->ei = initial["ei"].toInt();
         //cpu->reg.p = initial["p"].toInt();
         //cpu->reg.q = initial["q"].toInt();
 
@@ -110,6 +113,27 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
             int32_t addr = pair[0].toInt();
             int32_t val = pair[1].toInt();
             memory->WriteByte(addr, val);
+        }
+
+        // Set port initial values.
+        QJsonArray ports = obj["ports"].toArray();
+        for (int j = 0; j < ports.size(); j++)
+        {
+            QJsonArray port = ports[j].toArray();
+
+            // Test data assumes NMOS value, but I'm emulating CMOS.
+            if (opcode == "ED 71" && port[1].toInt() == 0)
+            {
+                port[1] = 255;
+                ports[j] = port;
+            }
+
+            if (port[2].toString() == "r")
+            {
+                uint8_t p = port[0].toInt() & 0xFF;
+                uint8_t v = port[1].toInt() & 0xFF;
+                memory->WritePort(p, v);
+            }
         }
 
         // Run the opcode.
@@ -149,7 +173,7 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F, 0xDE,
         0x04, 0x0C, 0x14, 0x1C, 0x24, 0x2C, 0x34, 0x3C, 0x03, 0x13, 0x23, 0x33,
         0x05, 0x0D, 0x15, 0x1D, 0x25, 0x2D, 0x35, 0x3D, 0x0B, 0x1B, 0x2B, 0x3B,
-        0x2F, 0x3F, 0x37,
+        0x2F, 0x3F, 0x37, 0x27,
         0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xE6,
         0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 0xEE,
         0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xF6,
@@ -159,7 +183,8 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         0xCD, 0xC4, 0xCC, 0xD4, 0xDC, 0xE4, 0xEC, 0xF4, 0xFC,
         0xC9, 0xC0, 0xC8, 0xD0, 0xD8, 0xE0, 0xE8, 0xF0, 0xF8,
         0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF,
-        0xF3, 0xFB,
+        0xF3, 0xFB, 0x76,
+        0xDB, 0xD3,
     };
     for (uint8_t i : implemented)
     {
@@ -175,6 +200,8 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         0x6F, 0x67,
         0x45, 0x4D,
         0x46, 0x4E, 0x56, 0x5E,
+        0x40, 0x48, 0x50, 0x58, 0x60, 0x68, 0x70, 0x78, 0xA2, 0xAA, 0xB2, 0xBA,
+        0x41, 0x49, 0x51, 0x59, 0x61, 0x69, 0x71, 0x79, 0xA3, 0xAB, 0xB3, 0xBB,
     };
     for (uint8_t i : implementedED)
         info.push_back(TestOpcodeTableED[i]);

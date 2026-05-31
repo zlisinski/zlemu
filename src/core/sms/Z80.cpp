@@ -1010,6 +1010,14 @@ void Z80::OutInd(uint8_t port)
 
 void Z80::ProcessOpcode()
 {
+    ei = false;
+
+    if (halted)
+    {
+        // TODO: add wait
+        return;
+    }
+
     uint8_t opcode = FetchOpcode();
 
     operandCount = 0;
@@ -1309,7 +1317,9 @@ void Z80::ProcessOpcode()
         case 0xF3: // DI
             iff1 = iff2 = false; break;
         case 0xFB: // EI
-            iff1 = iff2 = true; break;
+            iff1 = iff2 = ei = true; break;
+        case 0x76:
+            halted = true; break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// IO

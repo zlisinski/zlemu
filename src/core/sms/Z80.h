@@ -242,8 +242,10 @@ protected:
     };
     uint8_t operandCount = 0;
 
+    bool halted = false;
     bool iff1 = false;
     bool iff2 = false;
+    bool ei = false;
     uint8_t im = 0;
 
     Memory *memory = nullptr;

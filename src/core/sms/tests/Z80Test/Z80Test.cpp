@@ -25,8 +25,11 @@ public:
     ~Z80Ex() = default;
 
     using Z80::reg;
+    using Z80::halted;
     using Z80::iff1;
     using Z80::iff2;
+    using Z80::im;
+    using Z80::ei;
 };
 
 
@@ -95,10 +98,11 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
         cpu->reg.wz = initial["wz"].toInt();
         cpu->iff1 = initial["iff1"].toInt();
         cpu->iff2 = initial["iff2"].toInt();
-        //cpu->reg.im = initial["im"].toInt();
-        //cpu->reg.ei = initial["ei"].toInt();
+        cpu->im = initial["im"].toInt();
+        cpu->ei = initial["ei"].toInt();
         //cpu->reg.p = initial["p"].toInt();
         //cpu->reg.q = initial["q"].toInt();
+        cpu->halted = false;
 
         // Set RAM initial values.
         QJsonArray initialRam = initial["ram"].toArray();
@@ -169,8 +173,8 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
         EXPECT_EQ(cpu->reg.wz, final["wz"].toInt()) << testName;
         EXPECT_EQ(cpu->iff1, final["iff1"].toInt()) << testName;
         EXPECT_EQ(cpu->iff2, final["iff2"].toInt()) << testName;
-        //EXPECT_EQ(cpu->reg.im, final["im"].toInt()) << testName;
-        //EXPECT_EQ(cpu->reg.ei, final["ei"].toInt()) << testName;
+        EXPECT_EQ(cpu->im, final["im"].toInt()) << testName;
+        EXPECT_EQ(cpu->ei, final["ei"].toInt()) << testName;
         //EXPECT_EQ(cpu->reg.p, final["p"].toInt()) << testName;
         //EXPECT_EQ(cpu->reg.q, final["q"].toInt()) << testName;
 
@@ -250,8 +254,8 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\twz: 0x%1\n").arg(initial["wz"].toInt(), 4, 16, QChar('0'));
     str += QStringLiteral("\tiff1: 0x%1\n").arg(initial["iff1"].toInt(), 2, 16, QChar('0'));
     str += QStringLiteral("\tiff2: 0x%1\n").arg(initial["iff2"].toInt(), 2, 16, QChar('0'));
-    //str += QStringLiteral("\tim: 0x%1\n").arg(initial["im"].toInt(), 2, 16, QChar('0'));
-    //str += QStringLiteral("\tei: 0x%1\n").arg(initial["ei"].toInt(), 2, 16, QChar('0'));
+    str += QStringLiteral("\tim: 0x%1\n").arg(initial["im"].toInt(), 2, 16, QChar('0'));
+    str += QStringLiteral("\tei: 0x%1\n").arg(initial["ei"].toInt(), 2, 16, QChar('0'));
     //str += QStringLiteral("\tp: 0x%1\n").arg(initial["p"].toInt(), 2, 16, QChar('0'));
     //str += QStringLiteral("\tq: 0x%1\n").arg(initial["q"].toInt(), 2, 16, QChar('0'));
 
@@ -299,8 +303,8 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\twz: 0x%1\n").arg(final["wz"].toInt(), 4, 16, QChar('0'));
     str += QStringLiteral("\tiff1: 0x%1\n").arg(final["iff1"].toInt(), 2, 16, QChar('0'));
     str += QStringLiteral("\tiff2: 0x%1\n").arg(final["iff2"].toInt(), 2, 16, QChar('0'));
-    //str += QStringLiteral("\tim: 0x%1\n").arg(final["im"].toInt(), 2, 16, QChar('0'));
-    //str += QStringLiteral("\tei: 0x%1\n").arg(final["ei"].toInt(), 2, 16, QChar('0'));
+    str += QStringLiteral("\tim: 0x%1\n").arg(final["im"].toInt(), 2, 16, QChar('0'));
+    str += QStringLiteral("\tei: 0x%1\n").arg(final["ei"].toInt(), 2, 16, QChar('0'));
     //str += QStringLiteral("\tp: 0x%1\n").arg(final["p"].toInt(), 2, 16, QChar('0'));
     //str += QStringLiteral("\tq: 0x%1\n").arg(final["q"].toInt(), 2, 16, QChar('0'));
 
@@ -347,8 +351,8 @@ void Z80Test::FormatData(const QJsonObject &obj, QString &str)
     str += QStringLiteral("\twz: 0x%1\n").arg(cpu->reg.wz, 4, 16, QChar('0'));
     str += QStringLiteral("\tiff1: 0x%1\n").arg(cpu->iff1, 2, 16, QChar('0'));
     str += QStringLiteral("\tiff2: 0x%1\n").arg(cpu->iff2, 2, 16, QChar('0'));
-    //str += QStringLiteral("\tim: 0x%1\n").arg(cpu->reg.im, 2, 16, QChar('0'));
-    //str += QStringLiteral("\tei: 0x%1\n").arg(cpu->reg.ei, 2, 16, QChar('0'));
+    str += QStringLiteral("\tim: 0x%1\n").arg(cpu->im, 2, 16, QChar('0'));
+    str += QStringLiteral("\tei: 0x%1\n").arg(cpu->ei, 2, 16, QChar('0'));
     //str += QStringLiteral("\tp: 0x%1\n").arg(cpu->reg.p, 2, 16, QChar('0'));
     //str += QStringLiteral("\tq: 0x%1\n").arg(cpu->reg.q, 2, 16, QChar('0'));
 
@@ -400,7 +404,7 @@ std::vector<TestOpcodeInfo> GetTestingOpcodes()
         0xCD, 0xC4, 0xCC, 0xD4, 0xDC, 0xE4, 0xEC, 0xF4, 0xFC,
         0xC9, 0xC0, 0xC8, 0xD0, 0xD8, 0xE0, 0xE8, 0xF0, 0xF8,
         0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF,
-        0xF3, 0xFB,
+        0xF3, 0xFB, 0x76,
         0xDB, 0xD3,
     };
     for (uint8_t i : implemented)
