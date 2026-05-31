@@ -176,6 +176,7 @@ protected:
     void Neg();
     void Ccf();
     void Scf();
+    void Daa();
 
     void And(uint8_t value);
     void Or(uint8_t value);

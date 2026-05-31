@@ -524,6 +524,27 @@ inline void Z80::Scf()
 }
 
 
+inline void Z80::Daa()
+{
+    uint8_t oldA = reg.a;
+
+    if (reg.flags.c || reg.a > 0x99)
+    {
+        reg.a += reg.flags.n ? -0x60 : 0x60;
+        reg.flags.c = 1;
+    }
+    if (reg.flags.h || (reg.a & 0x0F) > 0x09)
+    {
+        reg.a += reg.flags.n ? -0x06 : 0x06;
+    }
+
+    reg.flags.h = Bytes::TestBit<HF>(reg.a ^ oldA);
+    reg.flags.p = GetParity(reg.a);
+    SetXYFlags(reg.a);
+    SetZSFlags(reg.a);
+}
+
+
 inline void Z80::And(uint8_t value)
 {
     uint8_t result = reg.a & value;
@@ -1010,6 +1031,9 @@ void Z80::ProcessOpcode()
 
         case 0x37: // SCF
             Scf(); break;
+
+        case 0x27: // DAA
+            Daa(); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Logic
