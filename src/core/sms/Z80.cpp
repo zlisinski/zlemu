@@ -1390,6 +1390,7 @@ void Z80::ProcessOpcodeED()
             Sbc16(reg.hl, GetReg16(opcode)); break;
 
         case 0x44: // NEG
+        case 0x4C: case 0x54: case 0x5C: case 0x64: case 0x6C: case 0x74: case 0x7C: // Undocumented NEG
             Neg(); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1406,17 +1407,19 @@ void Z80::ProcessOpcodeED()
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         case 0x45: case 0x4D: // RETN / RETI
+        case 0x55: case 0x65: case 0x75: // Undocumented RETN
+        case 0x5D: case 0x6D: case 0x7D: // Undocumented RETI
             Pop(reg.wz); reg.pc = reg.wz; iff1 = iff2; break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Interrupts
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        case 0x46: case 0x4E: // IM 0
+        case 0x46: case 0x4E: case 0x66: case 0x6E: // IM 0
             im = 0; break;
-        case 0x56: // IM 1
+        case 0x56: case 0x76: // IM 1
             im = 1; break;
-        case 0x5E: // IM 2
+        case 0x5E: case 0x7E: // IM 2
             im = 2; break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1453,7 +1456,9 @@ void Z80::ProcessOpcodeED()
         case 0xBB: // OTDR
             OutInd<false, true>(reg.c); break;
 
-        default: NotYetImplemented(opcode); break;
+        default:
+            // NOP
+            break;
     }
 }
 
