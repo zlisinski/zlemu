@@ -12,6 +12,7 @@ find_package(Qt5 REQUIRED COMPONENTS Core)
 add_executable(CpuBenchmark
     CpuBenchmark.cpp
     ../../Z80.cpp
+    ../../../Logger.cpp
     ../../../Utils.cpp
     ../CommonMocks/Memory.cpp
 )

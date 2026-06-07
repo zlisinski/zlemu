@@ -9,6 +9,7 @@
 // Include the mocks first so they override subsequent includes.
 #include "../CommonMocks/Memory.h"
 
+#include "../TestLogger.h"
 #include "../../Z80.h"
 #include "../Z80Test/TestOpcodes.h"
 
@@ -53,6 +54,7 @@ public:
 
     Z80Ex *cpu;
     Memory *memory;
+    TestLogger logger;
 };
 
 
@@ -143,7 +145,7 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
         elapsed += timer.nsecsElapsed();
     }
 
-    QString str = QStringLiteral("'%1', '%2'").arg(opcodeName, 30, ' ').arg(elapsed);
+    QString str = QStringLiteral("\"%1\", \"%2\"").arg(opcodeName, 30, ' ').arg(elapsed);
     printf("%s\n", qPrintable(str));
 }
 

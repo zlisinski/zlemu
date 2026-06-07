@@ -1,9 +1,11 @@
 #include <functional>
 #include <stdexcept>
 
-#include "../Bytes.h"
-#include "../Utils.h"
+#include "Bytes.h"
+#include "Logger.h"
+#include "Utils.h"
 #include "Z80.h"
+#include "Z80Opcodes.h"
 
 
 namespace Sms
@@ -166,15 +168,10 @@ inline void Z80::SetIndexType(IndexType type)
 }
 
 
-template <bool PrefixedCB>
 inline uint16_t Z80::Indexed()
 {
     if (indexType == IndexType::HL)
         return *index;
-
-    // Prefixed CB instructions already read the displacement.
-    if constexpr (!PrefixedCB)
-        ReadImm8();
 
     reg.wz = *index + static_cast<int8_t>(operand[0]);
 
@@ -187,7 +184,7 @@ inline void Z80::ValWrapper(uint8_t &r, auto&&... args)
 {
     if constexpr (PrefixedCB)
     {
-        uint16_t addr = Indexed<PrefixedCB>();
+        uint16_t addr = Indexed();
         r = PtrRead8(addr);
         r = std::invoke(Func, this, r, std::forward<decltype(args)>(args)...);
         PtrWrite8(addr, r);
@@ -1008,6 +1005,54 @@ void Z80::OutInd(uint8_t port)
 }
 
 
+inline void Z80::LogState() const
+{
+    LogCpu("State: a=%02X, bc=%04X, de=%04X, hl=%04X, ix=%04X, iy=%04X, pc=%04X, sp=%04X, flags=s:%d z:%d h:%d p:%d n:%d c:%d\n",
+           reg.a, reg.bc, reg.de, reg.hl, reg.ix, reg.iy, reg.pc, reg.sp,
+           reg.flags.s, reg.flags.z, reg.flags.h, reg.flags.p, reg.flags.n, reg.flags.c);
+}
+
+
+template <bool IsCB>
+void Z80::ReadArgsAndLog(const OpcodeInfo &opcode)
+{
+    switch (opcode.argType)
+    {
+        case OpcodeInfo::ArgTypes::None:
+            LogCpu(opcode.formatStr);
+            LogState();
+            break;
+        case OpcodeInfo::ArgTypes::N:
+            if constexpr (!IsCB)
+                ReadImm8();
+            LogCpu(opcode.formatStr, operand[0], operand[0]);
+            LogState();
+            break;
+        case OpcodeInfo::ArgTypes::D:
+            if constexpr (!IsCB)
+                ReadImm8();
+            LogCpu(opcode.formatStr, operand[0], static_cast<int8_t>(operand[0]));
+            LogState();
+            break;
+        case OpcodeInfo::ArgTypes::NN:
+            if constexpr (!IsCB)
+            {
+                reg.wz_ = reg.wz; // This is needed for 4 opcodes that don't change wz when reading immediate data.
+                ReadImm16();
+            }
+            LogCpu(opcode.formatStr, operand[0], operand[1], operandWord);
+            LogState();
+            break;
+        case OpcodeInfo::ArgTypes::DN:
+            if constexpr (!IsCB)
+                ReadImm16();
+            LogCpu(opcode.formatStr, operand[0], operand[1], static_cast<int8_t>(operand[0]), operand[1]);
+            LogState();
+            break;
+    }
+}
+
+
 void Z80::ProcessOpcode()
 {
     ei = false;
@@ -1052,6 +1097,18 @@ void Z80::ProcessOpcode()
         return;
     }
 
+    const OpcodeInfo &o = [&]() -> const OpcodeInfo &
+    {
+        switch (indexType)
+        {
+            case IndexType::IX: return OpcodeTableDD[opcode];
+            case IndexType::IY: return OpcodeTableFD[opcode];
+            default: return OpcodeTable[opcode];
+        }
+    }();
+
+    ReadArgsAndLog<false>(o);
+
     switch (opcode)
     {
         case 0x00: // NOP
@@ -1071,7 +1128,7 @@ void Z80::ProcessOpcode()
             LoadRegister8(GetDestReg8(opcode), GetSrcReg8(opcode)); break;
 
         case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x3E: // LD r, n
-            ReadImm8(); LoadRegister8(GetDestReg8(opcode), operand[0]); break;
+            LoadRegister8(GetDestReg8(opcode), operand[0]); break;
 
         case 0x46: case 0x4E: case 0x56: case 0x5E: case 0x66: case 0x6E: case 0x7E: // LD r, (HL|IX+d|IY+d)
             LoadRegister8(GetDestReg8Unindexed(opcode), PtrRead8(Indexed())); break;
@@ -1080,10 +1137,10 @@ void Z80::ProcessOpcode()
             LoadRegister8(reg.a, PtrRead8<true>(GetReg16(opcode))); break;
 
         case 0x2A: // LD HL|IX|IY, (nn)
-            ReadImm16(); LoadRegister16(*index, PtrRead16(operandWord)); break;
+            LoadRegister16(*index, PtrRead16(operandWord)); break;
 
         case 0x3A: // LD A, (nn)
-            ReadImm16(); LoadRegister8(reg.a, PtrRead8<true>(operandWord)); break;
+            LoadRegister8(reg.a, PtrRead8<true>(operandWord)); break;
 
         case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77: // LD (HL|IX+d|IY+d), r
             LoadPointer8(Indexed(), GetSrcReg8Unindexed(opcode)); break;
@@ -1092,21 +1149,16 @@ void Z80::ProcessOpcode()
             LoadPointer8<true>(GetReg16(opcode), reg.a); break;
 
         case 0x22: // LD (nn), HL|IX|IY
-            ReadImm16(); LoadPointer16(operandWord, *index); break;
+            LoadPointer16(operandWord, *index); break;
 
         case 0x32: // LD (nn), A
-            ReadImm16(); LoadPointer8<true>(operandWord, reg.a); break;
+            LoadPointer8<true>(operandWord, reg.a); break;
 
         case 0x36: // LD (HL|IX+d|IY+d), n
-        {
-            uint16_t addr = Indexed(); // DD or FD prefixes will call ReadImm8().
-            ReadImm8();
-            LoadPointer8(addr, operand[operandCount - 1]);
-            break;
-        }
+            LoadPointer8(Indexed(), operand[operandCount - 1]); break;
 
         case 0x01: case 0x11: case 0x21: case 0x31: // LD rr, nn
-            ReadImm16<false>(); LoadRegister16(GetReg16(opcode), operandWord); break;
+            reg.wz = reg.wz_; LoadRegister16(GetReg16(opcode), operandWord); break;
 
         case 0xF9: // LD SP, HL|IX|IY
             LoadRegister16(reg.sp, *index); break;
@@ -1155,7 +1207,7 @@ void Z80::ProcessOpcode()
         case 0x86: // ADD (HL|IX+d|IY+d)
             Add8(PtrRead8(Indexed())); break;
         case 0xC6: // ADD n
-            ReadImm8(); Add8(operand[0]); break;
+            Add8(operand[0]); break;
         case 0x09: case 0x19: case 0x29: case 0x39: // ADD HL|IX|IY, rr
             Add16(*index, GetReg16(opcode)); break;
 
@@ -1164,21 +1216,21 @@ void Z80::ProcessOpcode()
         case 0x8E: // ADC (HL|IX+d|IY+d)
             Add8(PtrRead8(Indexed()), reg.flags.c); break;
         case 0xCE: // ADC n
-            ReadImm8(); Add8(operand[0], reg.flags.c); break;
+            Add8(operand[0], reg.flags.c); break;
 
         case 0x90: case 0x91: case 0x92: case 0x93:case 0x94: case 0x95: case 0x97: // SUB r
             Sub8(GetSrcReg8(opcode)); break;
         case 0x96: // SUB (HL|IX+d|IY+d)
             Sub8(PtrRead8(Indexed())); break;
         case 0xD6: // SUB n
-            ReadImm8(); Sub8(operand[0]); break;
+            Sub8(operand[0]); break;
 
         case 0x98: case 0x99: case 0x9A: case 0x9B: case 0x9C: case 0x9D: case 0x9F: // SBC r
             Sub8(GetSrcReg8(opcode), reg.flags.c); break;
         case 0x9E: // SBC (HL|IX+d|IY+d)
             Sub8(PtrRead8(Indexed()), reg.flags.c); break;
         case 0xDE: // SBC n
-            ReadImm8(); Sub8(operand[0], reg.flags.c); break;
+            Sub8(operand[0], reg.flags.c); break;
 
         case 0x04: case 0x0C: case 0x14: case 0x1C: case 0x24: case 0x2C: case 0x3C: // INC r
             Inc8(GetDestReg8(opcode)); break;
@@ -1215,28 +1267,28 @@ void Z80::ProcessOpcode()
         case 0xA6: // AND (HL|IX+d|IY+d)
             And(PtrRead8(Indexed())); break;
         case 0xE6: // AND n
-            ReadImm8(); And(operand[0]); break;
+            And(operand[0]); break;
 
         case 0xB0: case 0xB1: case 0xB2: case 0xB3: case 0xB4: case 0xB5: case 0xB7: // OR r
             Or(GetSrcReg8(opcode)); break;
         case 0xB6: // OR (HL|IX+d|IY+d)
             Or(PtrRead8(Indexed())); break;
         case 0xF6: // OR n
-            ReadImm8(); Or(operand[0]); break;
+            Or(operand[0]); break;
 
         case 0xA8: case 0xA9: case 0xAA: case 0xAB: case 0xAC: case 0xAD: case 0xAF: // XOR r
             Xor(GetSrcReg8(opcode)); break;
         case 0xAE: // XOR (HL|IX+d|IY+d)
             Xor(PtrRead8(Indexed())); break;
         case 0xEE: // XOR n
-            ReadImm8(); Xor(operand[0]); break;
+            Xor(operand[0]); break;
 
         case 0xB8: case 0xB9: case 0xBA: case 0xBB: case 0xBC: case 0xBD: case 0xBF: // CP r
             Cp(GetSrcReg8(opcode)); break;
         case 0xBE: // CP (HL|IX+d|IY+d)
             Cp(PtrRead8(Indexed())); break;
         case 0xFE: // CP n
-            ReadImm8(); Cp(operand[0]); break;
+            Cp(operand[0]); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Rotate & Shift
@@ -1252,10 +1304,9 @@ void Z80::ProcessOpcode()
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         case 0xC3: // JP nn
-            ReadImm16(); reg.pc = operandWord; break;
+            reg.pc = operandWord; break;
         case 0xC2: case 0xCA: case 0xD2: case 0xDA: case 0xE2: case 0xEA: case 0xF2: case 0xFA: // JP cc, nn
         {
-            ReadImm16();
             if (FlagCheck(opcode))
                 reg.pc = operandWord;
             break;
@@ -1264,24 +1315,23 @@ void Z80::ProcessOpcode()
             reg.pc = *index; break;
 
         case 0x18: // JR e
-            ReadImm8(); Jr(true); break;
+            Jr(true); break;
         case 0x20: case 0x28: // JR Z|NZ
-            ReadImm8(); Jr(reg.flags.z == !!(opcode & 0x08)); break;
+            Jr(reg.flags.z == !!(opcode & 0x08)); break;
         case 0x30: case 0x38: // JR C|NC
-            ReadImm8(); Jr(reg.flags.c == !!(opcode & 0x08)); break;
+            Jr(reg.flags.c == !!(opcode & 0x08)); break;
 
         case 0x10: // DJNZ, e
-            ReadImm8(); reg.b--; Jr(reg.b); break;
+            reg.b--; Jr(reg.b); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Call & Return
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         case 0xCD: // CALL nn
-            ReadImm16(); Push(reg.pc); reg.pc = operandWord; break;
+            Push(reg.pc); reg.pc = operandWord; break;
         case 0xC4: case 0xCC: case 0xD4: case 0xDC: case 0xE4: case 0xEC: case 0xF4: case 0xFC: // CALL cc, nn
         {
-            ReadImm16();
             if (FlagCheck(opcode))
             {
                 Push(reg.pc);
@@ -1326,9 +1376,9 @@ void Z80::ProcessOpcode()
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         case 0xDB: // IN A, (n)
-            ReadImm8(); InImm(operand[0]); break;
+            InImm(operand[0]); break;
         case 0xD3: // OUT (n), A
-            ReadImm8(); OutImm(operand[0]); break;
+            OutImm(operand[0]); break;
 
         default: NotYetImplemented(opcode); break;
     }
@@ -1338,6 +1388,9 @@ void Z80::ProcessOpcode()
 void Z80::ProcessOpcodeED()
 {
     uint8_t opcode = FetchOpcode();
+
+    const OpcodeInfo &o = OpcodeTableED[opcode];
+    ReadArgsAndLog<false>(o);
 
     switch (opcode)
     {
@@ -1354,9 +1407,9 @@ void Z80::ProcessOpcodeED()
         case 0x5F: // LD A, R
             LoadRegister8(reg.a, reg.r); SetIRFlags(); break;
         case 0x4B: case 0x5B: case 0x6B: case 0x7B: // LD rr, nn
-            ReadImm16(); LoadRegister16(GetReg16(opcode), PtrRead16(operandWord)); break;
+            LoadRegister16(GetReg16(opcode), PtrRead16(operandWord)); break;
         case 0x43: case 0x53: case 0x63: case 0x73: // (nn), rr
-            ReadImm16(); LoadPointer16(operandWord, GetReg16(opcode)); break;
+            LoadPointer16(operandWord, GetReg16(opcode)); break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// Block Transfer
@@ -1484,55 +1537,67 @@ void Z80::ProcessOpcodeCB()
     uint8_t &src = GetSrcReg8Unindexed(opcode);
     uint8_t bit = (opcode >> 3) & 0x07;
 
+    const OpcodeInfo &o = [&]() -> const OpcodeInfo &
+    {
+        switch (indexType)
+        {
+            case IndexType::IX: return OpcodeTableDDCB[opcode];
+            case IndexType::IY: return OpcodeTableFDCB[opcode];
+            default: return OpcodeTableCB[opcode];
+        }
+    }();
+
+    ReadArgsAndLog<true>(o);
+
     switch (opcode)
     {
         // RLC
         case 0x00: case 0x01: case 0x02: case 0x03: case 0x04: case 0x05: case 0x07:
             ValWrapper<&Z80::Rlc, Prefixed>(src); break;
         case 0x06:
-            PtrWrapper<&Z80::Rlc>(Indexed<Prefixed>()); break;
+            PtrWrapper<&Z80::Rlc>(Indexed()); break;
 
         // RL
         case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x17:
             ValWrapper<&Z80::Rl, Prefixed>(src); break;
         case 0x16:
-            PtrWrapper<&Z80::Rl>(Indexed<Prefixed>()); break;
+            PtrWrapper<&Z80::Rl>(Indexed()); break;
 
         // SLA
         case 0x20: case 0x21: case 0x22: case 0x23: case 0x24: case 0x25: case 0x27:
             ValWrapper<&Z80::Sla, Prefixed>(src); break;
         case 0x26:
-            PtrWrapper<&Z80::Sla>(Indexed<Prefixed>()); break;
+            PtrWrapper<&Z80::Sla>(Indexed()); break;
 
         // SLL
         case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x37:
             ValWrapper<&Z80::Sll, Prefixed>(src); break;
         case 0x36:
-            PtrWrapper<&Z80::Sll>(Indexed<Prefixed>()); break;
+            PtrWrapper<&Z80::Sll>(Indexed()); break;
 
         // RRC
         case 0x08: case 0x09: case 0x0A: case 0x0B: case 0x0C: case 0x0D: case 0x0F:
             ValWrapper<&Z80::Rrc, Prefixed>(src); break;
         case 0x0E:
-            PtrWrapper<&Z80::Rrc>(Indexed<Prefixed>()); break;
+            PtrWrapper<&Z80::Rrc>(Indexed()); break;
 
         // RR
         case 0x18: case 0x19: case 0x1A: case 0x1B: case 0x1C: case 0x1D: case 0x1F:
             ValWrapper<&Z80::Rr, Prefixed>(src); break;
         case 0x1E:
-            PtrWrapper<&Z80::Rr>(Indexed<Prefixed>()); break;
+            PtrWrapper<&Z80::Rr>(Indexed()); break;
 
         // SRA
         case 0x28: case 0x29: case 0x2A: case 0x2B: case 0x2C: case 0x2D: case 0x2F:
             ValWrapper<&Z80::Sra, Prefixed>(src); break;
         case 0x2E:
-            PtrWrapper<&Z80::Sra>(Indexed<Prefixed>()); break;
+            PtrWrapper<&Z80::Sra>(Indexed()); break;
 
         // SRL
         case 0x38: case 0x39: case 0x3A: case 0x3B: case 0x3C: case 0x3D: case 0x3F:
             ValWrapper<&Z80::Srl, Prefixed>(src); break;
         case 0x3E:
-            PtrWrapper<&Z80::Srl>(Indexed<Prefixed>()); break;
+            PtrWrapper<&Z80::Srl>(Indexed()); break;
 
         // BIT
         case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x47:
@@ -1544,12 +1609,12 @@ void Z80::ProcessOpcodeCB()
         case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x77:
         case 0x78: case 0x79: case 0x7A: case 0x7B: case 0x7C: case 0x7D: case 0x7F:
             if constexpr (Prefixed)
-                Bit<true>(PtrRead8(Indexed<Prefixed>()), bit);
+                Bit<true>(PtrRead8(Indexed()), bit);
             else
                 Bit<false>(src, bit);
             break;
         case 0x46: case 0x4E: case 0x56: case 0x5E: case 0x66: case 0x6E: case 0x76: case 0x7E:
-            Bit<true>(PtrRead8(Indexed<Prefixed>()), bit); break;
+            Bit<true>(PtrRead8(Indexed()), bit); break;
 
         // RES
         case 0x80: case 0x81: case 0x82: case 0x83: case 0x84: case 0x85: case 0x87:
@@ -1562,7 +1627,7 @@ void Z80::ProcessOpcodeCB()
         case 0xB8: case 0xB9: case 0xBA: case 0xBB: case 0xBC: case 0xBD: case 0xBF:
             ValWrapper<&Z80::ResBit, Prefixed>(src, bit); break;
         case 0x86: case 0x8E: case 0x96: case 0x9E: case 0xA6: case 0xAE: case 0xB6: case 0xBE:
-            PtrWrapper<&Z80::ResBit>(Indexed<Prefixed>(), bit); break;
+            PtrWrapper<&Z80::ResBit>(Indexed(), bit); break;
 
         // SET
         case 0xC0: case 0xC1: case 0xC2: case 0xC3: case 0xC4: case 0xC5: case 0xC7:
@@ -1575,7 +1640,7 @@ void Z80::ProcessOpcodeCB()
         case 0xF8: case 0xF9: case 0xFA: case 0xFB: case 0xFC: case 0xFD: case 0xFF:
             ValWrapper<&Z80::SetBit, Prefixed>(src, bit); break;
         case 0xC6: case 0xCE: case 0xD6: case 0xDE: case 0xE6: case 0xEE: case 0xF6: case 0xFE:
-            PtrWrapper<&Z80::SetBit>(Indexed<Prefixed>(), bit); break;
+            PtrWrapper<&Z80::SetBit>(Indexed(), bit); break;
 
         default: NotYetImplemented(opcode); break;
     }

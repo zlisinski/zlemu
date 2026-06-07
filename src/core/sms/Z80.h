@@ -4,6 +4,7 @@
 
 #include "Zlemu.h"
 #include "Memory.h"
+#include "Z80Opcodes.h"
 
 
 namespace Sms
@@ -89,6 +90,7 @@ struct Registers
     uint16_t bc_ = 0;
     uint16_t de_ = 0;
     uint16_t hl_ = 0;
+    uint16_t wz_ = 0;
 
     uint8_t i = 0;
     uint8_t r = 0;
@@ -133,7 +135,6 @@ protected:
     uint16_t &GetReg16Stack(uint8_t opcode);
     bool FlagCheck(uint8_t opcode);
     void SetIndexType(IndexType type);
-    template <bool PrefixedCB = false>
     uint16_t Indexed();
 
     template <auto Func, bool PrefixedCB = false>
@@ -217,6 +218,10 @@ protected:
     void OutImm(uint8_t port);
     template <bool Increment, bool Repeat>
     void OutInd(uint8_t port);
+
+    void LogState() const;
+    template <bool IsCB>
+    void ReadArgsAndLog(const OpcodeInfo &opcode);
 
     void ProcessOpcodeED();
     template <bool Prefixed>

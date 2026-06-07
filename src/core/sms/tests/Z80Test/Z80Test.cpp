@@ -9,6 +9,7 @@
 // Include the mocks first so they override subsequent includes.
 #include "../CommonMocks/Memory.h"
 
+#include "../TestLogger.h"
 #include "../../Z80.h"
 #include "TestOpcodes.h"
 
@@ -54,6 +55,7 @@ protected:
 
     Z80Ex *cpu;
     Memory *memory;
+    TestLogger logger;
 };
 
 
