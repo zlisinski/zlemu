@@ -371,6 +371,7 @@ inline void Z80::BlockCompare()
 
     if (Repeat && reg.bc && !reg.flags.z)
     {
+        cycles += 5;
         reg.pc -= 2;
         reg.wz = reg.pc + 1;
         SetXYFlags(reg.pc >> 8);
@@ -885,6 +886,7 @@ inline void Z80::Jr(bool condition)
 {
     if (condition)
     {
+        cycles += 5;
         reg.pc += (int8_t)operand[0];
         reg.wz = reg.pc;
     }
@@ -944,6 +946,7 @@ void Z80::InInd(uint8_t port)
 
     if (Repeat && reg.b)
     {
+        cycles += 5;
         reg.pc -= 2;
         reg.wz = reg.pc + 1;
         SetXYFlags(reg.pc >> 8);
@@ -997,6 +1000,7 @@ void Z80::OutInd(uint8_t port)
 
     if (Repeat && reg.b)
     {
+        cycles += 5;
         reg.pc -= 2;
         reg.wz = reg.pc + 1;
         SetXYFlags(reg.pc >> 8);
@@ -1016,6 +1020,8 @@ inline void Z80::LogState() const
 template <bool IsCB>
 void Z80::ReadArgsAndLog(const OpcodeInfo &opcode)
 {
+    cycles = opcode.cycles;
+
     switch (opcode.argType)
     {
         case OpcodeInfo::ArgTypes::None:
@@ -1056,10 +1062,11 @@ void Z80::ReadArgsAndLog(const OpcodeInfo &opcode)
 void Z80::ProcessOpcode()
 {
     ei = false;
+    cycles = 0;
 
     if (halted)
     {
-        // TODO: add wait
+        cycles = 4;
         return;
     }
 
@@ -1315,7 +1322,9 @@ void Z80::ProcessOpcode()
             reg.pc = *index; break;
 
         case 0x18: // JR e
-            Jr(true); break;
+            reg.pc += (int8_t)operand[0];
+            reg.wz = reg.pc;
+            break;
         case 0x20: case 0x28: // JR Z|NZ
             Jr(reg.flags.z == !!(opcode & 0x08)); break;
         case 0x30: case 0x38: // JR C|NC
@@ -1334,6 +1343,7 @@ void Z80::ProcessOpcode()
         {
             if (FlagCheck(opcode))
             {
+                cycles += 7;
                 Push(reg.pc);
                 reg.pc = operandWord;
             }
@@ -1346,6 +1356,7 @@ void Z80::ProcessOpcode()
         {
             if (FlagCheck(opcode))
             {
+                cycles += 6;
                 Pop(reg.wz);
                 reg.pc = reg.wz;
             }

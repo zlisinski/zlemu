@@ -32,6 +32,7 @@ public:
     using Z80::iff2;
     using Z80::im;
     using Z80::ei;
+    using Z80::cycles;
 };
 
 
@@ -106,6 +107,7 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
         //cpu->reg.p = initial["p"].toInt();
         //cpu->reg.q = initial["q"].toInt();
         cpu->halted = false;
+        cpu->cycles = 0;
 
         // Set RAM initial values.
         QJsonArray initialRam = initial["ram"].toArray();
@@ -206,6 +208,10 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
                 EXPECT_EQ(memory->ReadPort(p), v);
             }
         }
+
+        // Verify timing.
+        QJsonArray cycles = obj["cycles"].toArray();
+        EXPECT_EQ(cpu->cycles, cycles.size()) << testName;
 
         // If there were errors, stop processing this opcode. We don't want 10000 errors.
         if (HasNonfatalFailure())

@@ -253,6 +253,8 @@ protected:
     bool ei = false;
     uint8_t im = 0;
 
+    uint8_t cycles;
+
     Memory *memory = nullptr;
 };
 
