@@ -3,13 +3,24 @@
 
 #include <QMainWindow>
 
-class MainWindow : public QMainWindow
+#include "../core/Logger.h"
+
+
+class AbsEmulator;
+
+
+class MainWindow : public QMainWindow, public LoggerOutput
 {
     Q_OBJECT
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    ~MainWindow() override;
+
+    void Output(std::unique_ptr<LogEntry> entry) override;
+
+protected:
+    AbsEmulator *emulator = nullptr;
 };
 
 

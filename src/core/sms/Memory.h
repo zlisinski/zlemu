@@ -2,9 +2,10 @@
 #define ZLEMU_CORE_SMS_MEMORY_H
 
 #include <array>
+#include <vector>
 
-#include "Bytes.h"
-#include "Zlemu.h"
+#include <core/Bytes.h>
+#include <core/Zlemu.h>
 
 
 namespace Sms
@@ -38,12 +39,15 @@ public:
 
     void ClearMemory()
     {
-        memory.fill(0);
+        ram.fill(0);
     }
 
+    void SetBios(std::vector<uint8_t>&& data) {this->bios = std::move(data);}
+
 protected:
-    std::array<uint8_t, 0x10000> memory = {0};
+    std::array<uint8_t, 0x2000> ram = {0};
     std::array<uint8_t, 0x100> portData = {0};
+    std::vector<uint8_t> bios;
 };
 
 

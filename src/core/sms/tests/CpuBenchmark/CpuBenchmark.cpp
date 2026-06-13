@@ -8,8 +8,10 @@
 
 // Include the mocks first so they override subsequent includes.
 #include "../CommonMocks/Memory.h"
+#include "../CommonMocks/Timer.h"
 
 #include "../TestLogger.h"
+#include "../../Interrupt.h"
 #include "../../Z80.h"
 #include "../Z80Test/TestOpcodes.h"
 
@@ -23,7 +25,7 @@ const QString JSON_PATH = "./test_data/z80/v1/";
 class Z80Ex : public Z80
 {
 public:
-    Z80Ex(Memory *memory) : Z80(memory) {}
+    Z80Ex(Memory *memory, Timer *timer, Interrupt *interrupt) : Z80(memory, timer, interrupt) {}
     ~Z80Ex() = default;
 
     using Z80::reg;
@@ -41,7 +43,9 @@ public:
     Z80Test()
     {
         memory = new Memory();
-        cpu = new Z80Ex(memory);
+        interrupt = new Interrupt();
+        timer = new Timer(nullptr, nullptr);
+        cpu = new Z80Ex(memory, timer, interrupt);
     }
 
     ~Z80Test()
@@ -54,6 +58,8 @@ public:
 
     Z80Ex *cpu;
     Memory *memory;
+    Timer *timer;
+    Interrupt *interrupt;
     TestLogger logger;
 };
 

@@ -1,9 +1,13 @@
+#include <format>
 #include <functional>
 #include <stdexcept>
 
-#include "Bytes.h"
-#include "Logger.h"
-#include "Utils.h"
+#include <core/Bytes.h>
+#include <core/Logger.h>
+#include <core/Utils.h>
+#include "Interrupt.h"
+#include "Memory.h"
+#include "Timer.h"
 #include "Z80.h"
 #include "Z80Opcodes.h"
 
@@ -12,8 +16,10 @@ namespace Sms
 {
 
 
-Z80::Z80(Memory *memory) :
-    memory(memory)
+Z80::Z80(Memory *memory, Timer *timer, Interrupt *interrupt) :
+    memory(memory),
+    timer(timer),
+    interrupt(interrupt)
 {
 }
 
@@ -1059,14 +1065,40 @@ void Z80::ReadArgsAndLog(const OpcodeInfo &opcode)
 }
 
 
+void Z80::CheckInterrupt()
+{
+    if (!ei && iff1 && interrupt->CheckInterrupt())
+    {
+        timer->AddCycles(6);
+        halted = false;
+        iff1 = false;
+        iff2 = false;
+
+        if (im != 1)
+            throw std::runtime_error("im != 1");
+
+        Push(reg.pc);
+        reg.wz = 0x0038;
+        reg.pc = reg.wz;
+
+        // Eventually clearing will happen when reading from VDP register.
+        interrupt->ClearInterrupt();
+    }
+}
+
+
 void Z80::ProcessOpcode()
 {
-    ei = false;
     cycles = 0;
+
+    CheckInterrupt();
+
+    ei = false;
 
     if (halted)
     {
         cycles = 4;
+        timer->AddCycles(cycles);
         return;
     }
 
@@ -1380,7 +1412,11 @@ void Z80::ProcessOpcode()
         case 0xFB: // EI
             iff1 = iff2 = ei = true; break;
         case 0x76:
-            halted = true; break;
+            halted = true;
+#ifndef TESTING
+            throw std::runtime_error("halted");
+#endif
+            break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// IO
@@ -1393,6 +1429,8 @@ void Z80::ProcessOpcode()
 
         default: NotYetImplemented(opcode); break;
     }
+
+    timer->AddCycles(cycles);
 }
 
 

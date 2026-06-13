@@ -16,6 +16,7 @@ add_executable(Z80Test
     ../../../Logger.cpp
     ../../../Utils.cpp
     ../CommonMocks/Memory.cpp
+    ../CommonMocks/Timer.cpp
 )
 
 target_link_libraries(Z80Test

@@ -1,0 +1,18 @@
+#ifndef ZLEMU_CORE_ABSEMULATOR_H
+#define ZLEMU_CORE_ABSEMULATOR_H
+
+
+#include <string_view>
+
+
+class AbsEmulator
+{
+public:
+    virtual ~AbsEmulator() = default;
+
+    virtual bool LoadRom(std::string_view filename) = 0;
+    virtual void EndEmulation() = 0;
+};
+
+
+#endif

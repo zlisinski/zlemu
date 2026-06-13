@@ -2,13 +2,17 @@
 #define ZLEMU_CORE_SMS_Z80_H
 
 
-#include "Zlemu.h"
-#include "Memory.h"
+#include <core/Zlemu.h>
 #include "Z80Opcodes.h"
 
 
 namespace Sms
 {
+
+
+class Interrupt;
+class Memory;
+class Timer;
 
 
 enum EFlagBit
@@ -103,7 +107,7 @@ struct Registers
 class Z80
 {
 public:
-    Z80(Memory *memory);
+    Z80(Memory *memory, Timer *timer, Interrupt *interrupt);
     ~Z80() = default;
 
     void Reset();
@@ -223,6 +227,8 @@ protected:
     template <bool IsCB>
     void ReadArgsAndLog(const OpcodeInfo &opcode);
 
+    void CheckInterrupt();
+
     void ProcessOpcodeED();
     template <bool Prefixed>
     void ProcessOpcodeCB();
@@ -256,6 +262,8 @@ protected:
     uint8_t cycles;
 
     Memory *memory = nullptr;
+    Timer *timer = nullptr;
+    Interrupt *interrupt = nullptr;
 };
 
 

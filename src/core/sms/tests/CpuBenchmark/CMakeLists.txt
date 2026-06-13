@@ -15,8 +15,11 @@ add_executable(CpuBenchmark
     ../../../Logger.cpp
     ../../../Utils.cpp
     ../CommonMocks/Memory.cpp
+    ../CommonMocks/Timer.cpp
 )
 
 target_link_libraries(CpuBenchmark
     Qt5::Core
 )
+
+add_compile_definitions("TESTING")
