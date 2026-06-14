@@ -1,4 +1,5 @@
 #include <core/Bytes.h>
+#include <core/DisplayInterface.h>
 #include <core/Logger.h>
 #include "Interrupt.h"
 #include "Vdp.h"
@@ -8,8 +9,9 @@ namespace Sms
 {
 
 
-Vdp::Vdp(Interrupt *interrupt) :
-    interrupt(interrupt)
+Vdp::Vdp(Interrupt *interrupt, DisplayInterface *displayInterface) :
+    interrupt(interrupt),
+    displayInterface(displayInterface)
 {
 }
 
@@ -53,6 +55,8 @@ void Vdp::Run(uint32_t masterClocks)
         else if (scanline == 192)
         {
             // Enter vblank
+            displayInterface->FrameReady(frameBuffer);
+
             Bytes::SetBit<7>(statusRegister);
             if (Bytes::TestBit<5>(regModeControl2))
             {

@@ -15,7 +15,8 @@ namespace Sms
 {
 
 
-Emulator::Emulator()
+Emulator::Emulator(DisplayInterface *displayInterface) :
+    displayInterface(displayInterface)
 {
 }
 
@@ -38,7 +39,7 @@ bool Emulator::LoadRom(std::string_view filename)
     std::vector<uint8_t> data(start, end);
 
     interrupt = new Interrupt();
-    vdp = new Vdp(interrupt);
+    vdp = new Vdp(interrupt, displayInterface);
     memory = new Memory();
     bus = new Bus(memory, vdp);
     timer = new Timer(vdp);

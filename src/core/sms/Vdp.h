@@ -6,6 +6,8 @@
 #include <core/Zlemu.h>
 
 
+class DisplayInterface;
+
 namespace Sms
 {
 
@@ -15,7 +17,7 @@ class Interrupt;
 class Vdp
 {
 public:
-    Vdp(Interrupt *interrupt);
+    Vdp(Interrupt *interrupt, DisplayInterface *displayInterface);
 
     void Run(uint32_t masterClocks);
 
@@ -41,6 +43,7 @@ protected:
 
     std::array<uint8_t, 0x4000> vram = {};
     std::array<uint8_t, 0x20> cram = {};
+    std::array<uint32_t, 256 * 240> frameBuffer = {};
 
     uint16_t mclks = 0;
 
@@ -73,6 +76,7 @@ protected:
     uint8_t regLineCounter = 0;               // 0x0A
 
     Interrupt *interrupt = nullptr;
+    DisplayInterface *displayInterface = nullptr;
 };
 
 

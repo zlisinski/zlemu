@@ -7,6 +7,8 @@
 #include <core/AbsEmulator.h>
 
 
+class DisplayInterface;
+
 namespace Sms
 {
 
@@ -21,7 +23,7 @@ class Z80;
 class Emulator : public AbsEmulator
 {
 public:
-    Emulator();
+    Emulator(DisplayInterface *displayInterface);
     ~Emulator() override;
 
     bool LoadRom(std::string_view filename) override;
@@ -35,12 +37,14 @@ protected:
 
     std::thread workThread;
 
-    Bus *bus;
+    Bus *bus = nullptr;
     Interrupt *interrupt = nullptr;
     Memory *memory = nullptr;
     Timer *timer = nullptr;
     Vdp *vdp = nullptr;
     Z80 *cpu = nullptr;
+
+    DisplayInterface *displayInterface = nullptr;
 };
 
 
