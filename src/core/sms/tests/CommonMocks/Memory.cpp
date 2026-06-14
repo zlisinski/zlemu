@@ -21,16 +21,4 @@ void Memory::WriteByte(uint16_t addr, uint8_t value)
 }
 
 
-uint8_t Memory::ReadPort(uint8_t port) const
-{
-    return portData[port];
-}
-
-
-void Memory::WritePort(uint8_t port, uint8_t value)
-{
-    portData[port] = value;
-}
-
-
 }

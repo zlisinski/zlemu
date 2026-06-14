@@ -2,6 +2,7 @@
 #include <vector>
 
 #include <core/Logger.h>
+#include "Bus.h"
 #include "Emulator.h"
 #include "Interrupt.h"
 #include "Memory.h"
@@ -36,11 +37,12 @@ bool Emulator::LoadRom(std::string_view filename)
     std::istreambuf_iterator<char> start(file), end;
     std::vector<uint8_t> data(start, end);
 
-    memory = new Memory();
     interrupt = new Interrupt();
-    vdp = new Vdp();
-    timer = new Timer(interrupt, vdp);
-    cpu = new Z80(memory, timer, interrupt);
+    vdp = new Vdp(interrupt);
+    memory = new Memory();
+    bus = new Bus(memory, vdp);
+    timer = new Timer(vdp);
+    cpu = new Z80(bus, memory, timer, interrupt);
 
     memory->SetBios(std::move(data));
 
@@ -66,7 +68,7 @@ void Emulator::ThreadFunc()
     {
         while (!quit)
         {
-            cpu->ProcessOpcode();
+            cpu->Cycle();
         }
     }
     catch (const std::exception &e)
@@ -79,11 +81,13 @@ void Emulator::ThreadFunc()
     delete interrupt;
     delete timer;
     delete memory;
+    delete bus;
     cpu = nullptr;
     interrupt = nullptr;
     memory = nullptr;
     timer = nullptr;
     vdp = nullptr;
+    bus = nullptr;
 }
 
 

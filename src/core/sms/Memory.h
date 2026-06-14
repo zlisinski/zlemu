@@ -33,21 +33,20 @@ public:
         WriteByte(addr + 1, Bytes::GetByte<1>(value));
     }
 
-    uint8_t ReadPort(uint8_t port) const;
-
-    void WritePort(uint8_t port, uint8_t value);
-
     void ClearMemory()
     {
-        ram.fill(0);
+        wram.fill(0);
     }
 
     void SetBios(std::vector<uint8_t>&& data) {this->bios = std::move(data);}
 
+    void SetMemoryControlRegister(uint8_t value);
+
 protected:
-    std::array<uint8_t, 0x2000> ram = {0};
-    std::array<uint8_t, 0x100> portData = {0};
+    std::array<uint8_t, 0x2000> wram = {0};
     std::vector<uint8_t> bios;
+
+    uint8_t memoryControlRegister = 0;
 };
 
 

@@ -5,6 +5,7 @@
 #include <core/Bytes.h>
 #include <core/Logger.h>
 #include <core/Utils.h>
+#include "Bus.h"
 #include "Interrupt.h"
 #include "Memory.h"
 #include "Timer.h"
@@ -16,7 +17,8 @@ namespace Sms
 {
 
 
-Z80::Z80(Memory *memory, Timer *timer, Interrupt *interrupt) :
+Z80::Z80(Bus *bus, Memory *memory, Timer *timer, Interrupt *interrupt) :
+    bus(bus),
     memory(memory),
     timer(timer),
     interrupt(interrupt)
@@ -55,13 +57,13 @@ inline void Z80::PtrWrite8(uint16_t addr, uint8_t value)
 
 inline uint8_t Z80::PortRead(uint8_t port)
 {
-    return memory->ReadPort(port);
+    return bus->ReadPort(port);
 }
 
 
 inline void Z80::PortWrite(uint8_t port, uint8_t value)
 {
-    memory->WritePort(port, value);
+    bus->WritePort(port, value);
 }
 
 
@@ -1026,6 +1028,7 @@ inline void Z80::LogState() const
 template <bool IsCB>
 void Z80::ReadArgsAndLog(const OpcodeInfo &opcode)
 {
+    operandCount = 0;
     cycles = opcode.cycles;
 
     switch (opcode.argType)
@@ -1069,6 +1072,7 @@ void Z80::CheckInterrupt()
 {
     if (!ei && iff1 && interrupt->CheckInterrupt())
     {
+        LogCpu("Processing interrupt");
         timer->AddCycles(6);
         halted = false;
         iff1 = false;
@@ -1080,14 +1084,11 @@ void Z80::CheckInterrupt()
         Push(reg.pc);
         reg.wz = 0x0038;
         reg.pc = reg.wz;
-
-        // Eventually clearing will happen when reading from VDP register.
-        interrupt->ClearInterrupt();
     }
 }
 
 
-void Z80::ProcessOpcode()
+void Z80::Cycle()
 {
     cycles = 0;
 
@@ -1104,7 +1105,6 @@ void Z80::ProcessOpcode()
 
     uint8_t opcode = FetchOpcode();
 
-    operandCount = 0;
     SetIndexType(IndexType::HL);
 
     // Multiple prefix bytes are allowed and just overwrite the previous one.
@@ -1121,21 +1121,37 @@ void Z80::ProcessOpcode()
     if (opcode == 0xCB)
     {
         if (index != &reg.hl)
-            ProcessOpcodeCB<true>();
+        {
+            // DD/FD CB opcodes always have a displacement byte before the final opcode byte.
+            ReadImm8();
+            // Don't use FetchOpcode, since that increments the r register.
+            opcode = ReadPC8();
+            ProcessOpcodeCB<true>(opcode);
+        }
         else
-            ProcessOpcodeCB<false>();
-
-        return;
+        {
+            opcode = FetchOpcode();
+            ProcessOpcodeCB<false>(opcode);
+        }
     }
-    if (opcode == 0xED)
+    else if (opcode == 0xED)
     {
         // 0xED ignores any previously set prefix.
         SetIndexType(IndexType::HL);
-
-        ProcessOpcodeED();
-        return;
+        opcode = FetchOpcode();
+        ProcessOpcodeED(opcode);
+    }
+    else
+    {
+        ProcessOpcode(opcode);
     }
 
+    timer->AddCycles(cycles);
+}
+
+
+void Z80::ProcessOpcode(uint8_t opcode)
+{
     const OpcodeInfo &o = [&]() -> const OpcodeInfo &
     {
         switch (indexType)
@@ -1429,15 +1445,11 @@ void Z80::ProcessOpcode()
 
         default: NotYetImplemented(opcode); break;
     }
-
-    timer->AddCycles(cycles);
 }
 
 
-void Z80::ProcessOpcodeED()
+void Z80::ProcessOpcodeED(uint8_t opcode)
 {
-    uint8_t opcode = FetchOpcode();
-
     const OpcodeInfo &o = OpcodeTableED[opcode];
     ReadArgsAndLog<false>(o);
 
@@ -1566,23 +1578,8 @@ void Z80::ProcessOpcodeED()
 
 
 template <bool Prefixed>
-void Z80::ProcessOpcodeCB()
+void Z80::ProcessOpcodeCB(uint8_t opcode)
 {
-    uint8_t opcode;
-
-    if constexpr (Prefixed)
-    {
-        // DD/FD CB opcodes always have a displacement byte before the final opcode byte.
-        ReadImm8();
-
-        // Don't use FetchOpcode, since that increments the r register.
-        opcode = ReadPC8();
-    }
-    else
-    {
-        opcode = FetchOpcode();
-    }
-
     uint8_t &src = GetSrcReg8Unindexed(opcode);
     uint8_t bit = (opcode >> 3) & 0x07;
 

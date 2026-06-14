@@ -5,9 +5,8 @@ namespace Sms
 {
 
 
-Timer::Timer(Interrupt *interrupt, Vdp *vdp)
+Timer::Timer(Vdp *vdp)
 {
-    (void)interrupt;
     (void)vdp;
 }
 

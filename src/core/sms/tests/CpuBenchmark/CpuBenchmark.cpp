@@ -7,6 +7,7 @@
 #include <QString>
 
 // Include the mocks first so they override subsequent includes.
+#include "../CommonMocks/Bus.h"
 #include "../CommonMocks/Memory.h"
 #include "../CommonMocks/Timer.h"
 
@@ -25,7 +26,7 @@ const QString JSON_PATH = "./test_data/z80/v1/";
 class Z80Ex : public Z80
 {
 public:
-    Z80Ex(Memory *memory, Timer *timer, Interrupt *interrupt) : Z80(memory, timer, interrupt) {}
+    Z80Ex(Bus *bus, Memory *memory, Timer *timer, Interrupt *interrupt) : Z80(bus, memory, timer, interrupt) {}
     ~Z80Ex() = default;
 
     using Z80::reg;
@@ -42,10 +43,11 @@ class Z80Test
 public:
     Z80Test()
     {
+        bus = new Bus(nullptr, nullptr);
         memory = new Memory();
         interrupt = new Interrupt();
-        timer = new Timer(nullptr, nullptr);
-        cpu = new Z80Ex(memory, timer, interrupt);
+        timer = new Timer(nullptr);
+        cpu = new Z80Ex(bus, memory, timer, interrupt);
     }
 
     ~Z80Test()
@@ -56,6 +58,7 @@ public:
 
     void RunInstructionTest(const QString &opcodeName, const QString &opcode);
 
+    Bus *bus;
     Z80Ex *cpu;
     Memory *memory;
     Timer *timer;
@@ -141,13 +144,13 @@ void Z80Test::RunInstructionTest(const QString &opcodeName, const QString &opcod
             {
                 uint8_t p = port[0].toInt() & 0xFF;
                 uint8_t v = port[1].toInt() & 0xFF;
-                memory->WritePort(p, v);
+                bus->WritePort(p, v);
             }
         }
 
         // Run the opcode.
         timer.start();
-        cpu->ProcessOpcode();
+        cpu->Cycle();
         elapsed += timer.nsecsElapsed();
     }
 

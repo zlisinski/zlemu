@@ -10,6 +10,7 @@ namespace Sms
 {
 
 
+class Bus;
 class Interrupt;
 class Memory;
 class Timer;
@@ -107,11 +108,11 @@ struct Registers
 class Z80
 {
 public:
-    Z80(Memory *memory, Timer *timer, Interrupt *interrupt);
+    Z80(Bus *bus, Memory *memory, Timer *timer, Interrupt *interrupt);
     ~Z80() = default;
 
     void Reset();
-    void ProcessOpcode();
+    void Cycle();
 
 protected:
     enum class IndexType {HL, IX, IY};
@@ -229,9 +230,10 @@ protected:
 
     void CheckInterrupt();
 
-    void ProcessOpcodeED();
+    void ProcessOpcode(uint8_t opcode);
+    void ProcessOpcodeED(uint8_t opcode);
     template <bool Prefixed>
-    void ProcessOpcodeCB();
+    void ProcessOpcodeCB(uint8_t opcode);
 
     void NotYetImplemented(uint8_t opcode) const;
 
@@ -261,6 +263,7 @@ protected:
 
     uint8_t cycles;
 
+    Bus *bus;
     Memory *memory = nullptr;
     Timer *timer = nullptr;
     Interrupt *interrupt = nullptr;

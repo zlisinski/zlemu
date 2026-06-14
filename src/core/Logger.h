@@ -22,7 +22,7 @@ enum class LogLevel
 enum class TraceLogLevel : uint32_t
 {
     eCpu = 0x01,
-    ePpu = 0x02,
+    eDisplay = 0x02,
     eMemory = 0x04,
     eInput = 0x08,
     eTimer = 0x10,
@@ -118,7 +118,7 @@ private:
 
 // Subsystem specific trace level logs.
 #define LogCpu(...)       do {if (Logger::IsTraceLevel(TraceLogLevel::eCpu))       Logger::TraceLog("Cpu:      ", __VA_ARGS__);} while (0)
-#define LogPpu(...)       do {if (Logger::IsTraceLevel(TraceLogLevel::ePpu))       Logger::TraceLog("Ppu       ", __VA_ARGS__);} while (0)
+#define LogDisplay(...)   do {if (Logger::IsTraceLevel(TraceLogLevel::eDisplay))   Logger::TraceLog("Display:  ", __VA_ARGS__);} while (0)
 #define LogMemory(...)    do {if (Logger::IsTraceLevel(TraceLogLevel::eMemory))    Logger::TraceLog("Memory:   ", __VA_ARGS__);} while (0)
 #define LogInput(...)     do {if (Logger::IsTraceLevel(TraceLogLevel::eInput))     Logger::TraceLog("Input:    ", __VA_ARGS__);} while (0)
 #define LogTimer(...)     do {if (Logger::IsTraceLevel(TraceLogLevel::eTimer))     Logger::TraceLog("Timer:    ", __VA_ARGS__);} while (0)

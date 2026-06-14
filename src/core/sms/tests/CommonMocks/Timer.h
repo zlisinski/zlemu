@@ -7,15 +7,13 @@
 namespace Sms
 {
 
-
-class Interrupt;
 class Vdp;
 
 
 class Timer
 {
 public:
-    Timer(Interrupt *interrupt, Vdp *vdp);
+    Timer(Vdp *vdp);
 
     void AddCycles(uint32_t cycles);
 

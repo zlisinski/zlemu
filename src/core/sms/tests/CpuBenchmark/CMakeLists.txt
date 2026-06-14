@@ -14,6 +14,7 @@ add_executable(CpuBenchmark
     ../../Z80.cpp
     ../../../Logger.cpp
     ../../../Utils.cpp
+    ../CommonMocks/Bus.cpp
     ../CommonMocks/Memory.cpp
     ../CommonMocks/Timer.cpp
 )

@@ -10,6 +10,7 @@
 namespace Sms
 {
 
+class Bus;
 class Interrupt;
 class Memory;
 class Timer;
@@ -34,6 +35,7 @@ protected:
 
     std::thread workThread;
 
+    Bus *bus;
     Interrupt *interrupt = nullptr;
     Memory *memory = nullptr;
     Timer *timer = nullptr;

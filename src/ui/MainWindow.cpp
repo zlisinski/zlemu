@@ -23,5 +23,8 @@ MainWindow::~MainWindow()
 
 void MainWindow::Output(std::unique_ptr<LogEntry> entry)
 {
-    printf("%s\n", entry->message.c_str());
+    char timeBuf[9];
+    tm *now = localtime(&entry->tv.tv_sec);
+    strftime(timeBuf, sizeof(timeBuf), "%H:%M:%S", now);
+    printf("%s.%06ld: %s\n", timeBuf, entry->tv.tv_usec, entry->message.c_str());
 }
