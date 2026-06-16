@@ -31,7 +31,9 @@ public:
     void WriteControl(uint8_t data);
 
 protected:
-    void DrawScanline();
+    uint8_t GetPixelColor(uint16_t tile, uint8_t x, uint8_t y) const;
+    void DrawScanline(uint16_t scanline);
+    void DrawBackground(uint16_t scanline);
 
     enum class ECode
     {
@@ -52,7 +54,7 @@ protected:
     uint8_t vCounter = 0;
 
     // These are the actual positions.
-    uint16_t scanline = 0;
+    uint16_t vPosition = 0;
     uint16_t hPosition = 0;
 
     uint8_t dataRegister = 0;

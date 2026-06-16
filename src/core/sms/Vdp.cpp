@@ -8,6 +8,17 @@
 namespace Sms
 {
 
+static constexpr uint32_t ColorTable[] = {
+    0x00000000, 0x00000055, 0x000000AA, 0x000000FF, 0x00005500, 0x00005555, 0x000055AA, 0x000055FF,
+    0x0000AA00, 0x0000AA55, 0x0000AAAA, 0x0000AAFF, 0x0000FF00, 0x0000FF55, 0x0000FFAA, 0x0000FFFF,
+    0x00550000, 0x00550055, 0x005500AA, 0x005500FF, 0x00555500, 0x00555555, 0x005555AA, 0x005555FF,
+    0x0055AA00, 0x0055AA55, 0x0055AAAA, 0x0055AAFF, 0x0055FF00, 0x0055FF55, 0x0055FFAA, 0x0055FFFF,
+    0x00AA0000, 0x00AA0055, 0x00AA00AA, 0x00AA00FF, 0x00AA5500, 0x00AA5555, 0x00AA55AA, 0x00AA55FF,
+    0x00AAAA00, 0x00AAAA55, 0x00AAAAAA, 0x00AAAAFF, 0x00AAFF00, 0x00AAFF55, 0x00AAFFAA, 0x00AAFFFF,
+    0x00FF0000, 0x00FF0055, 0x00FF00AA, 0x00FF00FF, 0x00FF5500, 0x00FF5555, 0x00FF55AA, 0x00FF55FF,
+    0x00FFAA00, 0x00FFAA55, 0x00FFAAAA, 0x00FFAAFF, 0x00FFFF00, 0x00FFFF55, 0x00FFFFAA, 0x00FFFFFF,
+};
+
 
 Vdp::Vdp(Interrupt *interrupt, DisplayInterface *displayInterface) :
     interrupt(interrupt),
@@ -45,14 +56,14 @@ void Vdp::Run(uint32_t masterClocks)
         // Reset mclks counter, but keep remainder.
         mclks &= 0x01;
         hPosition = 0;
-        scanline++;
+        vPosition++;
         vCounter++;
 
-        if (scanline < 192)
+        if (vPosition < 192)
         {
-            DrawScanline();
+            DrawScanline(vPosition);
         }
-        else if (scanline == 192)
+        else if (vPosition == 192)
         {
             // Enter vblank
             displayInterface->FrameReady(frameBuffer);
@@ -63,15 +74,15 @@ void Vdp::Run(uint32_t masterClocks)
                 interrupt->RequestInterrupt();
             }
         }
-        else if (scanline == 219)
+        else if (vPosition == 219)
         {
             // The value jumps backwards for some reason.
             vCounter -= 6;
         }
-        else if (scanline == 262)
+        else if (vPosition == 262)
         {
             // Exit vblank
-            scanline = 0;
+            vPosition = 0;
         }
     }
 }
@@ -184,9 +195,48 @@ void Vdp::WriteControl(uint8_t data)
 }
 
 
-void Vdp::DrawScanline()
+uint8_t Vdp::GetPixelColor(uint16_t tile, uint8_t x, uint8_t y) const
 {
+    const uint8_t *tileData = &vram[tile * 32];
+    uint8_t xOffset = 7 - x;
+    uint8_t yOffset = y * 4;
 
+    uint8_t bit0 = (tileData[yOffset] >> xOffset) & 0x01;
+    uint8_t bit1 = (tileData[yOffset + 1] >> xOffset) & 0x01;
+    uint8_t bit2 = (tileData[yOffset + 2] >> xOffset) & 0x01;
+    uint8_t bit3 = (tileData[yOffset + 3] >> xOffset) & 0x01;
+
+    return (bit3 << 3) | (bit2 << 2) | (bit1 << 1) | bit0;
+}
+
+
+void Vdp::DrawScanline(uint16_t scanline)
+{
+    DrawBackground(scanline);
+}
+
+
+void Vdp::DrawBackground(uint16_t scanline)
+{
+    uint8_t y = (scanline + regYScroll) % 224;
+    uint8_t yTile = y / 8;
+    uint8_t yOffset = y & 7;
+
+    for (int i = 0; i < 256; i++)
+    {
+        uint8_t x = (i + regXScroll) & 0xFF;
+        uint8_t xTile = x / 8;
+        uint8_t xOffset = x & 7;
+
+        uint16_t addr = ((regNameTableBaseAddr << 10) & 0x3800) | (yTile << 6) | (xTile << 1);
+        uint16_t tileIndex = vram[addr];
+        uint8_t tileAttr = vram[addr + 1];
+        tileIndex |= (tileAttr & 0x01) << 8;
+
+        uint8_t colorIndex = GetPixelColor(tileIndex, xOffset, yOffset);
+        uint8_t color = cram[colorIndex];
+        frameBuffer[(scanline * 256) + x] = ColorTable[color];
+    }
 }
 
 

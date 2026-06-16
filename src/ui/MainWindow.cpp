@@ -54,7 +54,7 @@ void MainWindow::onFrameReady()
         frameCount++;
     }
 
-    QImage img((uchar *)(&frameBuffer[0]), 256, 240, QImage::Format_ARGB32);
+    QImage img((uchar *)(&frameBuffer[0]), 256, 240, QImage::Format_RGB32);
     graphicsView->scene()->clear();
     QGraphicsPixmapItem *pixmap = graphicsView->scene()->addPixmap(QPixmap::fromImage(img));
     pixmap->setScale(2);
