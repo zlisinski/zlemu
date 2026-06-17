@@ -1,21 +1,39 @@
 #include <QGraphicsView>
-#include <QLabel>
 #include <QGraphicsPixmapItem>
+#include <QFileDialog>
+#include <QLabel>
+#include <QMenuBar>
 #include <QStatusBar>
 #include <core/sms/Emulator.h>
 
+#include "LogWindow.h"
 #include "MainWindow.h"
+#include "Settings.h"
+
+
+constexpr int MAX_RECENT_FILES = 20;
+
+Settings settings;
 
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent)
 {
-    Logger::SetOutput(this);
-    Logger::SetLogLevel(LogLevel::eTrace);
-    Logger::SetTraceLevel(0xFFFFFFFF);
+    QCoreApplication::setOrganizationName("zlisinski");
+    QCoreApplication::setApplicationName("zlemu");
+    settings.Load();
 
-    connect(this, &MainWindow::SignalFrameReady, this, &MainWindow::onFrameReady, Qt::QueuedConnection);
+    Logger::SetLogLevel(static_cast<LogLevel>(settings.logLevel));
+    Logger::SetTraceLevel(settings.traceLevel);
+    logWindow = new LogWindow(this);
+    connect(logWindow, &LogWindow::SignalLogWindowClosed, this, &MainWindow::onLogWindowClosed);
+    if (settings.logWindowEnabled)
+        logWindow->show();
+    Logger::SetOutput(logWindow);
 
+    restoreGeometry(settings.mainWindowGeometry);
+
+    SetupMenuBar();
     SetupStatusBar();
 
     graphicsView = new QGraphicsView(this);
@@ -23,12 +41,14 @@ MainWindow::MainWindow(QWidget *parent) :
     setCentralWidget(graphicsView);
     QGraphicsScene *scene = new QGraphicsScene(this);
     graphicsView->setScene(scene);
-    SetDisplayScale(2);
+    SetDisplayScale(settings.displayScale);
 
     fpsTimer.start();
+    frameCapTimer.start();
 
     emulator = new Sms::Emulator(this);
-    emulator->LoadRom("US-European BIOS v1.3 (1986).sms");
+
+    connect(this, &MainWindow::SignalFrameReady, this, &MainWindow::onFrameReady, Qt::QueuedConnection);
 }
 
 
@@ -57,7 +77,7 @@ void MainWindow::onFrameReady()
     QImage img((uchar *)(&frameBuffer[0]), 256, 240, QImage::Format_RGB32);
     graphicsView->scene()->clear();
     QGraphicsPixmapItem *pixmap = graphicsView->scene()->addPixmap(QPixmap::fromImage(img));
-    pixmap->setScale(2);
+    pixmap->setScale(settings.displayScale);
 }
 
 
@@ -70,6 +90,20 @@ void MainWindow::FrameReady(const std::array<uint32_t, 256 * 240> &displayFrameB
 
     // Signal the main thread to draw the screen.
     emit SignalFrameReady();
+
+    int64_t elapsedTime = frameCapTimer.elapsed();
+
+    if (settings.frameCap > 0)
+    {
+        const double frameMillis = 1.0 / settings.frameCap * 1000;
+        if (elapsedTime < frameMillis)
+        {
+            // Block the Emulator from running to limit frame rate.
+            std::this_thread::sleep_for(std::chrono::milliseconds((int)(frameMillis - elapsedTime)));
+        }
+    }
+
+    frameCapTimer.restart();
 }
 
 
@@ -79,12 +113,145 @@ void MainWindow::RequestMessageBox(const std::string &message)
 }
 
 
-void MainWindow::Output(std::unique_ptr<LogEntry> entry)
+// Don't make filename a reference, since this can be called from the recent file menu, which we will destroy in here.
+// I'll fix this better later.
+void MainWindow::OpenRom(QString filename, bool saveToRecent)
 {
-    char timeBuf[9];
-    tm *now = localtime(&entry->tv.tv_sec);
-    strftime(timeBuf, sizeof(timeBuf), "%H:%M:%S", now);
-    printf("%s.%06ld: %s\n", timeBuf, entry->tv.tv_usec, entry->message.c_str());
+    if (filename != "")
+    {
+        if (saveToRecent)
+            UpdateRecentFile(filename);
+
+        if (!emulator->LoadRom(filename.toStdString()))
+        {
+            LogError("Error loading ROM");
+            return;
+        }
+
+        setWindowTitle("ZLEMU - " + filename);
+    }
+}
+
+
+void MainWindow::UpdateRecentFile(const QString &filename)
+{
+    settings.recentFilesList.removeAll(filename);
+    settings.recentFilesList.prepend(filename);
+    while (settings.recentFilesList.size() > MAX_RECENT_FILES)
+        settings.recentFilesList.removeLast();
+    settings.Save();
+    UpdateRecentFilesActions();
+}
+
+
+void MainWindow::UpdateRecentFilesActions()
+{
+    recentFilesActions.clear();
+    recentFileMenu->clear();
+    for (const QString &filename : settings.recentFilesList)
+        recentFileMenu->addAction(filename, [&]{OpenRom(filename);});
+}
+
+
+void MainWindow::keyPressEvent(QKeyEvent *event)
+{
+    QMainWindow::keyPressEvent(event);
+}
+
+
+void MainWindow::keyReleaseEvent(QKeyEvent *event)
+{
+    QMainWindow::keyReleaseEvent(event);
+}
+
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (emulator)
+        emulator->EndEmulation();
+
+    settings.mainWindowGeometry = saveGeometry();
+    settings.Save();
+
+    QMainWindow::closeEvent(event);
+}
+
+
+void MainWindow::SetupMenuBar()
+{
+    menuBar()->setNativeMenuBar(false);
+
+    QMenu *fileMenu = menuBar()->addMenu("&File");
+    fileMenu->addAction("&Open ROM...", [this]
+    {
+        QString filename = QFileDialog::getOpenFileName(this, "Open ROM File", settings.lastRomDirectory);
+        if (!filename.isEmpty())
+        {
+            QFileInfo info(filename);
+            settings.lastRomDirectory = info.absolutePath();
+            settings.Save();
+        }
+        OpenRom(filename);
+    });
+
+    recentFileMenu = fileMenu->addMenu("Open &Recent");
+    UpdateRecentFilesActions();
+
+    fileMenu->addSeparator();
+    fileMenu->addAction("&Settings...", []{});
+    fileMenu->addSeparator();
+    fileMenu->addAction("&Quit", [this]{this->close();});
+
+    QMenu *emuMenu = menuBar()->addMenu("&Emulator");
+    emuMenu->addAction("&Reset", [this]{if (emulator) {emulator->Reset();}});
+    emuMenu->addAction("&Pause", [this]{if (emulator) {emulator->Pause();}});
+    emuMenu->addAction("&End Emulation", [this]{if (emulator) {emulator->EndEmulation();}});
+
+    QMenu *emuSpeedMenu = emuMenu->addMenu("&Speed");
+    QActionGroup *emuSpeedGroup = new QActionGroup(this);
+    std::pair<QString, int> speedVals[4] = {{"&Half", 30}, {"&Normal", 60}, {"&Double", 120}, {"&Uncapped", 0}};
+    for (const auto &speedVal : speedVals)
+    {
+        QAction *action = emuSpeedGroup->addAction(speedVal.first);
+        action->setCheckable(true);
+        if (speedVal.second == settings.frameCap)
+            action->setChecked(true);
+        connect(action, &QAction::triggered, [=]
+        {
+            settings.frameCap = speedVal.second;
+            settings.Save();
+        });
+        emuSpeedMenu->addAction(action);
+    }
+
+    QMenu *displayMenu = menuBar()->addMenu("&Display");
+    QMenu *displaySizeMenu = displayMenu->addMenu("&Size");
+    QActionGroup *displaySizeGroup = new QActionGroup(this);
+    for (int i = 1; i < 6; i++)
+    {
+        QAction *action = displaySizeGroup->addAction(QString("&%1x").arg(i));
+        action->setCheckable(true);
+        if (i == settings.displayScale)
+            action->setChecked(true);
+        connect(action, &QAction::triggered, [this, i]
+        {
+            SetDisplayScale(i);
+        });
+        displaySizeMenu->addAction(action);
+    }
+
+    displayMenu->addSeparator();
+    displayLogWindowAction = displayMenu->addAction("&Log Window", [this](bool checked)
+    {
+        settings.logWindowEnabled = checked;
+        settings.Save();
+        if (checked)
+            logWindow->show();
+        else
+            logWindow->hide();
+    });
+    displayLogWindowAction->setCheckable(true);
+    displayLogWindowAction->setChecked(settings.logWindowEnabled);
 }
 
 
@@ -99,9 +266,17 @@ void MainWindow::SetupStatusBar()
 
 void MainWindow::SetDisplayScale(int scale)
 {
+    LogInfo("SetDisplayScale %d", scale);
     graphicsView->scene()->clear();
     graphicsView->setSceneRect(0, 0, 256*scale, 240*scale);
     graphicsView->setFixedSize(256*scale, 240*scale);
     adjustSize();
-    displayScale = scale;
+    settings.displayScale = scale;
+    settings.Save();
+}
+
+
+void MainWindow::onLogWindowClosed()
+{
+    displayLogWindowAction->setChecked(false);
 }

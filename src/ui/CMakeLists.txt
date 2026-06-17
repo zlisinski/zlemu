@@ -16,7 +16,9 @@ find_package(Qt5
 include_directories(../)
 
 set(UI_SRC
+    LogWindow.cpp
     MainWindow.cpp
+    Settings.cpp
 )
 
 add_library(zlemu_ui

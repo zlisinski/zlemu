@@ -12,6 +12,8 @@ public:
 
     virtual bool LoadRom(std::string_view filename) = 0;
     virtual void EndEmulation() = 0;
+    virtual void Reset() = 0;
+    virtual void Pause() = 0;
 };
 
 

@@ -38,6 +38,8 @@ bool Emulator::LoadRom(std::string_view filename)
     std::istreambuf_iterator<char> start(file), end;
     std::vector<uint8_t> data(start, end);
 
+    EndEmulation();
+
     interrupt = new Interrupt();
     vdp = new Vdp(interrupt, displayInterface);
     memory = new Memory();
@@ -65,6 +67,8 @@ void Emulator::EndEmulation()
 
 void Emulator::ThreadFunc()
 {
+    quit = false;
+
     try
     {
         while (!quit)

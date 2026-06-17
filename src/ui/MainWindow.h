@@ -10,11 +10,12 @@
 
 
 class AbsEmulator;
+class LogWindow;
 class QGraphicsView;
 class QLabel;
 
 
-class MainWindow : public QMainWindow, public LoggerOutput, public DisplayInterface
+class MainWindow : public QMainWindow, public DisplayInterface
 {
     Q_OBJECT
 
@@ -25,34 +26,43 @@ public:
     void FrameReady(const std::array<uint32_t, 256 * 240> &displayFrameBuffer) override;
     void RequestMessageBox(const std::string &message) override;
 
-    void Output(std::unique_ptr<LogEntry> entry) override;
-
 protected:
+    void OpenRom(QString filename, bool saveToRecent = true);
+    void UpdateRecentFile(const QString &filename);
+    void UpdateRecentFilesActions();
+
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
+
+    void SetupMenuBar();
     void SetupStatusBar();
     void SetDisplayScale(int scale);
 
     AbsEmulator *emulator = nullptr;
 
     std::array<uint32_t, 256 * 240> frameBuffer = {};
-    int displayScale = 1;
 
     QGraphicsView *graphicsView = nullptr;
     QLabel *labelFps = nullptr;
     QLabel *labelPause = nullptr;
 
-    // Frame cap variables.
     QElapsedTimer frameCapTimer;
-    int frameCapSetting = 0;
-
-    // FPS variables.
     QElapsedTimer fpsTimer;
     int frameCount = 0;
+
+    QList<QAction *> recentFilesActions;
+    QMenu *recentFileMenu = nullptr;
+
+    LogWindow *logWindow = nullptr;
+    QAction *displayLogWindowAction = nullptr;
 
 signals:
     void SignalFrameReady();
 
 protected slots:
     void onFrameReady();
+    void onLogWindowClosed();
 };
 
 

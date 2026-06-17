@@ -27,8 +27,7 @@ enum class TraceLogLevel : uint32_t
     eInput = 0x08,
     eTimer = 0x10,
     eInterrupt = 0x20,
-    eApu = 0x40,
-    eDma = 0x80,
+    eAudio = 0x40,
 };
 
 
@@ -123,7 +122,7 @@ private:
 #define LogInput(...)     do {if (Logger::IsTraceLevel(TraceLogLevel::eInput))     Logger::TraceLog("Input:    ", __VA_ARGS__);} while (0)
 #define LogTimer(...)     do {if (Logger::IsTraceLevel(TraceLogLevel::eTimer))     Logger::TraceLog("Timer:    ", __VA_ARGS__);} while (0)
 #define LogInterrupt(...) do {if (Logger::IsTraceLevel(TraceLogLevel::eInterrupt)) Logger::TraceLog("Int:      ", __VA_ARGS__);} while (0)
-#define LogApu(...)       do {if (Logger::IsTraceLevel(TraceLogLevel::eApu))       Logger::TraceLog("Apu:      ", __VA_ARGS__);} while (0)
+#define LogAudio(...)     do {if (Logger::IsTraceLevel(TraceLogLevel::eAudio))     Logger::TraceLog("Audio:    ", __VA_ARGS__);} while (0)
 
 
 #endif

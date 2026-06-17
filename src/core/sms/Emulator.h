@@ -28,12 +28,14 @@ public:
 
     bool LoadRom(std::string_view filename) override;
     void EndEmulation() override;
+    void Reset() override {}
+    void Pause() override {}
 
 protected:
     void ThreadFunc();
 
-    bool paused = false;
-    bool quit = false;
+    volatile bool paused = false;
+    volatile bool quit = false;
 
     std::thread workThread;
 
