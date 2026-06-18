@@ -9,6 +9,7 @@
 #include "LogWindow.h"
 #include "MainWindow.h"
 #include "Settings.h"
+#include "UiUtils.h"
 
 
 constexpr int MAX_RECENT_FILES = 20;
@@ -122,9 +123,32 @@ void MainWindow::OpenRom(QString filename, bool saveToRecent)
         if (saveToRecent)
             UpdateRecentFile(filename);
 
-        if (!emulator->LoadRom(filename.toStdString()))
+        if (settings.sms.biosEnabled)
         {
-            LogError("Error loading ROM");
+            QFile file(settings.sms.biosFilename);
+            if (!file.open(QIODevice::ReadOnly))
+            {
+                UiUtils::MessageBox("Error opening bios file " + settings.sms.biosFilename);
+                return;
+            }
+            QByteArray byteArray = file.readAll();
+            file.close();
+            emulator->SetBios(std::vector<uint8_t>(byteArray.begin(), byteArray.end()));
+        }
+
+        QFile file(filename);
+        if (!file.open(QIODevice::ReadOnly))
+        {
+            UiUtils::MessageBox("Error opening rom file " + filename);
+            return;
+        }
+        QByteArray byteArray = file.readAll();
+        file.close();
+        emulator->SetRom(std::vector<uint8_t>(byteArray.begin(), byteArray.end()));
+
+        if (!emulator->StartEmulation())
+        {
+            UiUtils::MessageBox("Error starting emulation");
             return;
         }
 
@@ -266,7 +290,6 @@ void MainWindow::SetupStatusBar()
 
 void MainWindow::SetDisplayScale(int scale)
 {
-    LogInfo("SetDisplayScale %d", scale);
     graphicsView->scene()->clear();
     graphicsView->setSceneRect(0, 0, 256*scale, 240*scale);
     graphicsView->setFixedSize(256*scale, 240*scale);

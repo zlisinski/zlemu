@@ -27,16 +27,25 @@ Emulator::~Emulator()
 }
 
 
-bool Emulator::LoadRom(std::string_view filename)
+void Emulator::SetBios(std::vector<uint8_t> data)
 {
-    std::ifstream file(filename.data(), std::ios::binary);
-    if (!file)
+    bios = std::move(data);
+}
+
+
+void Emulator::SetRom(std::vector<uint8_t> data)
+{
+    rom = std::move(data);
+}
+
+
+bool Emulator::StartEmulation()
+{
+    if (rom.empty())
     {
-        LogError("Unable to open file %s", filename.data());
+        LogError("No ROM loaded");
         return false;
     }
-    std::istreambuf_iterator<char> start(file), end;
-    std::vector<uint8_t> data(start, end);
 
     EndEmulation();
 
@@ -47,7 +56,10 @@ bool Emulator::LoadRom(std::string_view filename)
     timer = new Timer(vdp);
     cpu = new Z80(bus, memory, timer, interrupt);
 
-    memory->SetBios(std::move(data));
+    if (!bios.empty())
+        memory->SetBios(bios);
+    memory->SetRom(rom);
+    memory->Reset();
 
     workThread = std::thread(&Emulator::ThreadFunc, this);
 

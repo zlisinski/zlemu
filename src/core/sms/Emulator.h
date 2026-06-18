@@ -26,7 +26,9 @@ public:
     Emulator(DisplayInterface *displayInterface);
     ~Emulator() override;
 
-    bool LoadRom(std::string_view filename) override;
+    void SetBios(std::vector<uint8_t> data) override;
+    void SetRom(std::vector<uint8_t> data) override;
+    bool StartEmulation() override;
     void EndEmulation() override;
     void Reset() override {}
     void Pause() override {}
@@ -38,6 +40,9 @@ protected:
     volatile bool quit = false;
 
     std::thread workThread;
+
+    std::vector<uint8_t> bios;
+    std::vector<uint8_t> rom;
 
     Bus *bus = nullptr;
     Interrupt *interrupt = nullptr;

@@ -38,13 +38,20 @@ public:
         wram.fill(0);
     }
 
-    void SetBios(std::vector<uint8_t>&& data) {this->bios = std::move(data);}
+    void SetBios(const std::vector<uint8_t>& data);
+    void SetRom(const std::vector<uint8_t>& data);
+
+    void Reset();
 
     void SetMemoryControlRegister(uint8_t value);
 
 protected:
+    void MapPage(uint8_t dest, uint8_t src);
+
+    std::array<uint8_t, 0xC000> memory;
     std::array<uint8_t, 0x2000> wram = {0};
     std::vector<uint8_t> bios;
+    std::vector<uint8_t> rom;
 
     uint8_t memoryControlRegister = 0;
 };
