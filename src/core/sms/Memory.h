@@ -54,6 +54,8 @@ protected:
     std::vector<uint8_t> rom;
 
     uint8_t memoryControlRegister = 0;
+    bool isCartEnabled = false;
+    bool isBiosEnabled = false;
 };
 
 

@@ -1428,11 +1428,7 @@ void Z80::ProcessOpcode(uint8_t opcode)
         case 0xFB: // EI
             iff1 = iff2 = ei = true; break;
         case 0x76:
-            halted = true;
-#ifndef TESTING
-            throw std::runtime_error("halted");
-#endif
-            break;
+            halted = true; break;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// IO

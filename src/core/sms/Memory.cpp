@@ -31,13 +31,17 @@ void Memory::WriteByte(uint16_t addr, uint8_t value)
 
     this->wram[addr & 0x1FFF] = value;
 
-    if ((addr & 0x1FFF) == 0x1FFC)
+    // Only perform mapping if cartridge slot enabled.
+    if (addr >= 0xFFFC && isCartEnabled)
     {
-        LogMemory("Write to RAM select register NYI %02X", value);
-    }
-    else if ((addr & 0xFF00) >= 0xFFFD)
-    {
-        MapPage((addr & 0xFF00) - 0xFFFD, value);
+        if (addr == 0xFFFC)
+        {
+            LogMemory("Write to RAM select register NYI %02X", value);
+        }
+        else if (addr >= 0xFFFD)
+        {
+            MapPage(addr - 0xFFFD, value);
+        }
     }
 }
 
@@ -60,38 +64,59 @@ void Memory::Reset()
     wram.fill(0);
 
     if (!bios.empty())
+    {
         memcpy(&memory[0], &bios[0], std::min(bios.size(), memory.size()));
+        memoryControlRegister = 0xE0; // 11100000
+        isBiosEnabled = true;
+        isCartEnabled = false;
+    }
     else
+    {
         memcpy(&memory[0], &rom[0], std::min(rom.size(), memory.size()));
+        memoryControlRegister = 0xAB; // 10101011
+        isBiosEnabled = false;
+        isCartEnabled = true;
+        wram[0] = 0xAB;
+    }
 }
 
 
 void Memory::SetMemoryControlRegister(uint8_t value)
 {
-    LogMemory("memoryControlRegister=%02X", value);
+    memoryControlRegister = value;
+
+    bool oldCartEnabled = isCartEnabled;
+    bool oldBiosEnabled = isBiosEnabled;
 
     // All bits are active 0.
-    // If the cartridge slot was just enabled.
-    if (!Bytes::TestBit<6>(value) && Bytes::TestBit<6>(memoryControlRegister))
+    isCartEnabled = !Bytes::TestBit<6>(value);
+    isBiosEnabled = !Bytes::TestBit<3>(value);
+
+    bool cartChanged = isCartEnabled ^ oldCartEnabled;
+    bool biosChanged = isBiosEnabled ^ oldBiosEnabled;
+
+    LogMemory("memoryControlRegister=%02X Cart=%d Bios=%d", value, isCartEnabled, isBiosEnabled);
+
+    if (isCartEnabled && cartChanged)
     {
+        // The cartridge slot was just enabled.
+        LogMemory("Bios handoff to cartridge");
         memcpy(&memory[0], &rom[0], std::min(rom.size(), memory.size()));
     }
-
-    memoryControlRegister = value;
+    else if (isBiosEnabled && biosChanged && !isCartEnabled)
+    {
+        // The bios was re-enabled.
+        LogMemory("Bios take over from cartridge");
+        memcpy(&memory[0], &bios[0], std::min(bios.size(), memory.size()));
+    }
 }
 
 
 void Memory::MapPage(uint8_t dest, uint8_t src)
 {
     constexpr uint16_t pageSize = 0x4000;
-    uint16_t srcOffset = src * pageSize;
-    uint16_t destOffset = dest * pageSize;
-
-    if (srcOffset > rom.size())
-    {
-        LogError("Attempting to map bad page %04X of rom size %04X", srcOffset, rom.size());
-        return;
-    }
+    uint32_t srcOffset = (src * pageSize) & (rom.size() - 1);
+    uint32_t destOffset = dest * pageSize;
 
     LogMemory("Mapping ROM page %u to bank %u", src, dest);
 
