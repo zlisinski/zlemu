@@ -31,6 +31,7 @@ public:
     void WriteControl(uint8_t data);
 
 protected:
+    void SetScreenHeight();
     uint8_t GetPixelColor(uint16_t tile, uint8_t x, uint8_t y) const;
     void DrawScanline(uint16_t scanline);
     void DrawBackground(uint16_t scanline);
@@ -65,17 +66,40 @@ protected:
     ECode codeRegister = ECode::ReadVram;
     uint16_t addressRegister = 0;
 
-    uint8_t regModeControl1 = 0;              // 0x00
-    uint8_t regModeControl2 = 0;              // 0x01
-    uint8_t regNameTableBaseAddr = 0;         // 0x02
-    uint8_t regColorTableBaseAddr = 0;        // 0x03
-    uint8_t regBackgroundPatternBaseAddr = 0; // 0x04
-    uint8_t regSpriteAttributeBaseAddr = 0;   // 0x05
-    uint8_t regSpritePatternBaseAddr = 0;     // 0x06
-    uint8_t regOverscanColor = 0;             // 0x07
-    uint8_t regXScroll = 0;                   // 0x08
-    uint8_t regYScroll = 0;                   // 0x09
-    uint8_t regLineCounter = 0;               // 0x0A
+    uint8_t regModeControl1 = 0;                 // 0x00
+    uint8_t regModeControl2 = 0;                 // 0x01
+    uint8_t regNameTableBaseAddr = 0xFF;         // 0x02
+    uint8_t regColorTableBaseAddr = 0xFF;        // 0x03
+    uint8_t regBackgroundPatternBaseAddr = 0xFF; // 0x04
+    uint8_t regSpriteAttributeBaseAddr = 0xFF;   // 0x05
+    uint8_t regSpritePatternBaseAddr = 0xFB;     // 0x06
+    uint8_t regOverscanColor = 0;                // 0x07
+    uint8_t regXScroll = 0;                      // 0x08
+    uint8_t regYScroll = 0;                      // 0x09
+    uint8_t regLineCounter = 255;                // 0x0A
+
+    uint8_t screenHeight = 192;
+
+    // Mode Control 1
+    bool isSideStatusBar = false;
+    bool isTopStatusBar = false;
+    bool isMaskCol0 = true;
+    bool isLineIntEnabled = true;
+    bool isShiftSprites = false;
+    bool isModeM4 = true;
+    bool isModeM2 = true;
+
+    // Mode Control 2
+    bool isDisplayEnabled = true;
+    bool isFrameIntEnabled = true;
+    bool isModeM1 = false;
+    bool isModeM3 = false;
+    uint8_t spriteHeight = 8;
+    bool isSpriteDoubleSize = false;
+
+    uint16_t nameTableBaseAddr = 0x3800;
+    uint16_t spriteAttributeBaseAddr = 0x3F00;
+    bool spritePatternHighBit = false;
 
     Interrupt *interrupt = nullptr;
     DisplayInterface *displayInterface = nullptr;

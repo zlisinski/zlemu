@@ -150,19 +150,48 @@ void Vdp::WriteControl(uint8_t data)
     {
         uint8_t reg = (addressRegister >> 8) & 0x0F;
         data = addressRegister & 0xFF;
+        LogDisplay("Write to VDP register %02X %02X", reg, data);
         switch (reg)
         {
             case 0x00:
                 regModeControl1 = data;
+
+                isSideStatusBar = Bytes::TestBit<7>(regModeControl1);
+                isTopStatusBar = Bytes::TestBit<6>(regModeControl1);
+                isMaskCol0 = Bytes::TestBit<5>(regModeControl1);
+                isLineIntEnabled = Bytes::TestBit<4>(regModeControl1);
+                isShiftSprites = Bytes::TestBit<3>(regModeControl1);
+                isModeM4 = Bytes::TestBit<2>(regModeControl1);
+                isModeM2 = Bytes::TestBit<1>(regModeControl1);
+
+                LogDisplay("SideStatusBar=%d TopStatusBar=%d MaskCol0=%d LineInt=%d ShiftSprites=%d M4=%d M2=%d",
+                    isSideStatusBar, isTopStatusBar, isMaskCol0, isLineIntEnabled, isShiftSprites, isModeM4, isModeM2);
+
+                SetScreenHeight();
                 break;
             case 0x01:
                 regModeControl2 = data;
+
+                isDisplayEnabled = Bytes::TestBit<6>(regModeControl2);
+                isFrameIntEnabled = Bytes::TestBit<5>(regModeControl2);
+                isModeM1 = Bytes::TestBit<4>(regModeControl2);
+                isModeM3 = Bytes::TestBit<3>(regModeControl2);
+                spriteHeight = 8 + (8 * Bytes::TestBit<1>(regModeControl2));
+                isSpriteDoubleSize = Bytes::TestBit<0>(regModeControl2);
+
                 // Clearing the IE bit clears any pending interrupts.
                 if (!Bytes::TestBit<5>(regModeControl2))
                     interrupt->ClearInterrupt();
+
+                LogDisplay("DisplayOn=%d FrameInt=%d M1=%d M3=%d SpriteHeight=%d 2xSprite=%d",
+                    isDisplayEnabled, isFrameIntEnabled, isModeM1, isModeM3, spriteHeight, isSpriteDoubleSize);
+
+                SetScreenHeight();
                 break;
             case 0x02:
                 regNameTableBaseAddr = data;
+                nameTableBaseAddr = (data & 0x0E) << 10;
+                LogDisplay("NameTableBaseAddr=%04X", nameTableBaseAddr);
                 break;
             case 0x03:
                 regColorTableBaseAddr = data;
@@ -172,26 +201,48 @@ void Vdp::WriteControl(uint8_t data)
                 break;
             case 0x05:
                 regSpriteAttributeBaseAddr = data;
+                spriteAttributeBaseAddr = (data & 0x7E) << 7;
+                LogDisplay("SpriteAttributeBaseAddr=%04X", spriteAttributeBaseAddr);
                 break;
             case 0x06:
                 regSpritePatternBaseAddr = data;
+                spritePatternHighBit = Bytes::TestBit<2>(regSpritePatternBaseAddr);
+                LogDisplay("spritePatternHighBit=%d", spritePatternHighBit);
                 break;
             case 0x07:
                 regOverscanColor = data;
+                LogDisplay("OverscanColor=%02X", regOverscanColor);
                 break;
             case 0x08:
                 regXScroll = data;
+                LogDisplay("XScroll=%02X", regXScroll);
                 break;
             case 0x09:
                 regYScroll = data;
+                LogDisplay("YScroll=%02X", regYScroll);
                 break;
             case 0x0A:
                 regLineCounter = data;
+                LogDisplay("LineCounter=%02X", regLineCounter);
                 break;
             default:
                 break;
         }
     }
+}
+
+
+void Vdp::SetScreenHeight()
+{
+    screenHeight = 192;
+    if (isModeM4 && isModeM2)
+    {
+        if (isModeM3 && !isModeM1)
+            screenHeight = 240;
+        else if (isModeM1 && !isModeM3)
+            screenHeight = 224;
+    }
+    LogDisplay("ScreenHeight=%d", screenHeight);
 }
 
 
@@ -220,21 +271,26 @@ void Vdp::DrawBackground(uint16_t scanline)
 {
     uint8_t y = (scanline + regYScroll) % 224;
     uint8_t yTile = y / 8;
-    uint8_t yOffset = y & 7;
 
     for (int i = 0; i < 256; i++)
     {
         uint8_t x = (i + regXScroll) & 0xFF;
         uint8_t xTile = x / 8;
         uint8_t xOffset = x & 7;
+        uint8_t yOffset = y & 7;
 
-        uint16_t addr = ((regNameTableBaseAddr << 10) & 0x3800) | (yTile << 6) | (xTile << 1);
+        uint16_t addr = nameTableBaseAddr | (yTile << 6) | (xTile << 1);
         uint16_t tileIndex = vram[addr];
         uint8_t tileAttr = vram[addr + 1];
         tileIndex |= (tileAttr & 0x01) << 8;
 
+        if (Bytes::TestBit<1>(tileAttr))
+            xOffset = 7 - xOffset;
+        if (Bytes::TestBit<2>(tileAttr))
+            yOffset = 7 - yOffset;
+
         uint8_t colorIndex = GetPixelColor(tileIndex, xOffset, yOffset);
-        uint8_t color = cram[colorIndex];
+        uint8_t color = cram[colorIndex + (16 * Bytes::GetBit<3>(tileAttr))];
         frameBuffer[(scanline * 256) + x] = ColorTable[color];
     }
 }
