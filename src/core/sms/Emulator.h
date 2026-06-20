@@ -31,7 +31,7 @@ public:
     bool StartEmulation() override;
     void EndEmulation() override;
     void Reset() override {}
-    void Pause() override {}
+    void Pause(bool pause) override {paused = pause;}
 
 protected:
     void ThreadFunc();

@@ -15,7 +15,7 @@ public:
     virtual bool StartEmulation() = 0;
     virtual void EndEmulation() = 0;
     virtual void Reset() = 0;
-    virtual void Pause() = 0;
+    virtual void Pause(bool pause) = 0;
 };
 
 

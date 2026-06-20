@@ -85,7 +85,10 @@ void Emulator::ThreadFunc()
     {
         while (!quit)
         {
-            cpu->Cycle();
+            if (!paused)
+                cpu->Cycle();
+            else
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
     catch (const std::exception &e)

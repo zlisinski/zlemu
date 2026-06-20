@@ -228,7 +228,15 @@ void MainWindow::SetupMenuBar()
 
     QMenu *emuMenu = menuBar()->addMenu("&Emulator");
     emuMenu->addAction("&Reset", [this]{if (emulator) {emulator->Reset();}});
-    emuMenu->addAction("&Pause", [this]{if (emulator) {emulator->Pause();}});
+    QAction *pauseAction = emuMenu->addAction("&Pause", [this](bool checked)
+    {
+        if (emulator)
+        {
+            labelPause->setText(checked ? "Paused" : "");
+            emulator->Pause(checked);
+        }
+    }, Qt::Key_Escape);
+    pauseAction->setCheckable(true);
     emuMenu->addAction("&End Emulation", [this]{if (emulator) {emulator->EndEmulation();}});
 
     QMenu *emuSpeedMenu = emuMenu->addMenu("&Speed");
