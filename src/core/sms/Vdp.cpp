@@ -274,7 +274,7 @@ void Vdp::DrawBackground(uint16_t scanline)
 
     for (int i = 0; i < 256; i++)
     {
-        uint8_t x = (i + regXScroll) & 0xFF;
+        uint8_t x = isTopStatusBar && scanline < 16 ? i : (i - regXScroll) & 0xFF;
         uint8_t xTile = x / 8;
         uint8_t xOffset = x & 7;
         uint8_t yOffset = y & 7;
@@ -291,7 +291,7 @@ void Vdp::DrawBackground(uint16_t scanline)
 
         uint8_t colorIndex = GetPixelColor(tileIndex, xOffset, yOffset);
         uint8_t color = cram[colorIndex + (16 * Bytes::GetBit<3>(tileAttr))];
-        frameBuffer[(scanline * 256) + x] = ColorTable[color];
+        frameBuffer[(scanline * 256) + i] = ColorTable[color];
     }
 }
 
