@@ -59,11 +59,11 @@ void Vdp::Run(uint32_t masterClocks)
         vPosition++;
         vCounter++;
 
-        if (vPosition < 192)
+        if (vPosition <= 192)
         {
-            DrawScanline(vPosition);
+            DrawScanline(vPosition - 1);
         }
-        else if (vPosition == 192)
+        else if (vPosition == 193)
         {
             // Enter vblank
             displayInterface->FrameReady(frameBuffer);
