@@ -261,9 +261,74 @@ uint8_t Vdp::GetPixelColor(uint16_t tile, uint8_t x, uint8_t y) const
 }
 
 
+uint8_t Vdp::GetSpritePixelColor(uint8_t x, uint8_t y)
+{
+    uint8_t ret = 0xFF;
+
+    for (int i = 0; i < spriteCount; i++)
+    {
+        int spriteShift = isShiftSprites * -8;
+        int spriteX = sprites[i].x + spriteShift;
+
+        if (x < spriteX || x >= spriteX + 8)
+            continue;
+
+        uint8_t xOffset = x - spriteX;
+        uint8_t yOffset = y - sprites[i].y - 1;
+        uint16_t tileIndex = (spritePatternHighBit << 8) | sprites[i].tile;
+
+        uint8_t colorIndex = GetPixelColor(tileIndex, xOffset, yOffset);
+        if (colorIndex != 0)
+        {
+            // If this is the first non-transparent color, save it and keep checking for sprite collisions.
+            if (ret == 0xFF)
+                ret = colorIndex;
+            else
+            {
+                Bytes::SetBit<5>(statusRegister);
+                break;
+            }
+        }
+    }
+
+    return ret;
+}
+
+
+void Vdp::LoadNextSprites(uint16_t scanline)
+{
+    spriteCount = 0;
+    uint8_t *data = &vram[spriteAttributeBaseAddr];
+
+    for (int i = 0; i < 64; i++)
+    {
+        uint8_t spriteY = data[i];
+
+        if (screenHeight == 192 && spriteY == 0xD0)
+            break;
+
+        if (scanline < spriteY || scanline >= spriteY + spriteHeight)
+            continue;
+
+        if (spriteCount < 8)
+        {
+            uint8_t spriteX = data[0x80 + (i * 2)];
+            uint8_t spriteTile = data[0x80 + (i * 2) + 1];
+            sprites[spriteCount++] = {spriteY, spriteX, spriteTile};
+        }
+        else
+        {
+            Bytes::SetBit<6>(statusRegister);
+            break;
+        }
+    }
+}
+
+
 void Vdp::DrawScanline(uint16_t scanline)
 {
     DrawBackground(scanline);
+    LoadNextSprites(scanline);
 }
 
 
@@ -282,15 +347,28 @@ void Vdp::DrawBackground(uint16_t scanline)
         uint16_t addr = nameTableBaseAddr | (yTile << 6) | (xTile << 1);
         uint16_t tileIndex = vram[addr];
         uint8_t tileAttr = vram[addr + 1];
+        bool flipX = Bytes::TestBit<1>(tileAttr);
+        bool flipY = Bytes::TestBit<2>(tileAttr);
+        bool highPalette = Bytes::TestBit<3>(tileAttr);
+        bool bgPriority = Bytes::TestBit<4>(tileAttr);
+
         tileIndex |= (tileAttr & 0x01) << 8;
 
-        if (Bytes::TestBit<1>(tileAttr))
+        if (flipX)
             xOffset = 7 - xOffset;
-        if (Bytes::TestBit<2>(tileAttr))
+        if (flipY)
             yOffset = 7 - yOffset;
 
         uint8_t colorIndex = GetPixelColor(tileIndex, xOffset, yOffset);
-        uint8_t color = cram[colorIndex + (16 * Bytes::GetBit<3>(tileAttr))];
+        uint8_t spriteColorIndex = GetSpritePixelColor(i, scanline);
+
+        if (spriteColorIndex != 0xFF && !bgPriority)
+        {
+            colorIndex = spriteColorIndex;
+            highPalette = true;
+        }
+
+        uint8_t color = cram[colorIndex + (16 * highPalette)];
         frameBuffer[(scanline * 256) + i] = ColorTable[color];
     }
 }

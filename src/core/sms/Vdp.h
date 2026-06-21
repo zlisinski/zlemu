@@ -33,6 +33,8 @@ public:
 protected:
     void SetScreenHeight();
     uint8_t GetPixelColor(uint16_t tile, uint8_t x, uint8_t y) const;
+    uint8_t GetSpritePixelColor(uint8_t x, uint8_t y);
+    void LoadNextSprites(uint16_t scanline);
     void DrawScanline(uint16_t scanline);
     void DrawBackground(uint16_t scanline);
 
@@ -100,6 +102,14 @@ protected:
     uint16_t nameTableBaseAddr = 0x3800;
     uint16_t spriteAttributeBaseAddr = 0x3F00;
     bool spritePatternHighBit = false;
+
+    struct Sprite
+    {
+        uint8_t y;
+        uint8_t x;
+        uint8_t tile;
+    } sprites[8] = {};
+    uint8_t spriteCount = 0;
 
     Interrupt *interrupt = nullptr;
     DisplayInterface *displayInterface = nullptr;
