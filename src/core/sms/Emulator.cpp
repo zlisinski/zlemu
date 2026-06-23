@@ -4,6 +4,7 @@
 #include <core/Logger.h>
 #include "Bus.h"
 #include "Emulator.h"
+#include "Input.h"
 #include "Interrupt.h"
 #include "Memory.h"
 #include "Timer.h"
@@ -49,10 +50,11 @@ bool Emulator::StartEmulation()
 
     EndEmulation();
 
+    input = new Input();
     interrupt = new Interrupt();
     vdp = new Vdp(interrupt, displayInterface);
     memory = new Memory();
-    bus = new Bus(memory, vdp);
+    bus = new Bus(input, memory, vdp);
     timer = new Timer(vdp);
     cpu = new Z80(bus, memory, timer, interrupt);
 
@@ -77,6 +79,26 @@ void Emulator::EndEmulation()
 }
 
 
+void Emulator::ButtonPressed(Buttons::Button button)
+{
+    uint8_t oldButtonData = buttons.data;
+    buttons.data |= button;
+
+    if (input && buttons.data != oldButtonData)
+        input->SetButtons(buttons);
+}
+
+
+void Emulator::ButtonReleased(Buttons::Button button)
+{
+    uint8_t oldButtonData = buttons.data;
+    buttons.data &= ~button;
+
+    if (input && buttons.data != oldButtonData)
+        input->SetButtons(buttons);
+}
+
+
 void Emulator::ThreadFunc()
 {
     quit = false;
@@ -96,18 +118,20 @@ void Emulator::ThreadFunc()
         LogError(e.what());
     }
 
-    delete cpu;
-    delete vdp;
-    delete interrupt;
-    delete timer;
-    delete memory;
     delete bus;
+    delete cpu;
+    delete input;
+    delete interrupt;
+    delete memory;
+    delete timer;
+    delete vdp;
+    bus = nullptr;
     cpu = nullptr;
+    input = nullptr;
     interrupt = nullptr;
     memory = nullptr;
     timer = nullptr;
     vdp = nullptr;
-    bus = nullptr;
 }
 
 

@@ -7,6 +7,7 @@
 namespace Sms
 {
 
+class Input;
 class Memory;
 class Vdp;
 
@@ -14,14 +15,15 @@ class Vdp;
 class Bus
 {
 public:
-    Bus(Memory *memory, Vdp *vdp);
+    Bus(Input *input, Memory *memory, Vdp *vdp);
 
     uint8_t ReadPort(uint8_t port) const;
     void WritePort(uint8_t port, uint8_t value);
 
 protected:
-    Memory *memory;
-    Vdp *vdp;
+    Input *input = nullptr;
+    Memory *memory = nullptr;
+    Vdp *vdp = nullptr;
 };
 
 

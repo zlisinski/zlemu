@@ -1,10 +1,10 @@
 #ifndef ZLEMU_CORE_SMS_EMULATOR_H
 #define ZLEMU_CORE_SMS_EMULATOR_H
 
-#include <string_view>
 #include <thread>
 
 #include <core/AbsEmulator.h>
+#include <core/Buttons.h>
 
 
 class DisplayInterface;
@@ -13,6 +13,7 @@ namespace Sms
 {
 
 class Bus;
+class Input;
 class Interrupt;
 class Memory;
 class Timer;
@@ -32,6 +33,8 @@ public:
     void EndEmulation() override;
     void Reset() override {}
     void Pause(bool pause) override {paused = pause;}
+    void ButtonPressed(Buttons::Button button) override;
+    void ButtonReleased(Buttons::Button button) override;
 
 protected:
     void ThreadFunc();
@@ -45,6 +48,8 @@ protected:
     std::vector<uint8_t> rom;
 
     Bus *bus = nullptr;
+    Buttons buttons;
+    Input *input = nullptr;
     Interrupt *interrupt = nullptr;
     Memory *memory = nullptr;
     Timer *timer = nullptr;

@@ -1,5 +1,7 @@
 #include <core/Logger.h>
 #include "Bus.h"
+
+#include "Input.h"
 #include "Memory.h"
 #include "Vdp.h"
 
@@ -8,7 +10,8 @@ namespace Sms
 {
 
 
-Bus::Bus(Memory *memory, Vdp *vdp) :
+Bus::Bus(Input *input, Memory *memory, Vdp *vdp) :
+    input(input),
     memory(memory),
     vdp(vdp)
 {
@@ -38,12 +41,10 @@ uint8_t Bus::ReadPort(uint8_t port) const
             return vdp->ReadControl();
 
         case 0xC0: // 0xC0-0xFE even
-            // TODO: Return IO A/B
-            return 0xFF;
+            return input->ReadPort1();
 
         case 0xC1: // 0xC1-0xFF odd
-            // TODO: Return IO B/Misc
-            return 0xFF;
+            return input->ReadPort2();
 
         default:
             return 0;
@@ -58,12 +59,12 @@ void Bus::WritePort(uint8_t port, uint8_t value)
     switch (port & 0xC1)
     {
         case 0x00: // 0x00-0x3E even
-            // TODO: Disable IO chip if bit is set
             memory->SetMemoryControlRegister(value);
+            input->SetEnabled(Bytes::TestBit<2>(value));
             break;
 
         case 0x01: // 0x01-0x3F odd
-            // TODO: Set IO control register
+            input->SetIoControlRegister(value);
             break;
 
         case 0x40: // 0x40-0x7E even

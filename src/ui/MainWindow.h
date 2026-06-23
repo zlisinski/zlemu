@@ -4,7 +4,9 @@
 #include <QApplication>
 #include <QElapsedTimer>
 #include <QMainWindow>
+#include <QtGamepad>
 
+#include "../core/Buttons.h"
 #include "../core/Logger.h"
 #include "../core/DisplayInterface.h"
 
@@ -37,6 +39,8 @@ protected:
 
     void SetupMenuBar();
     void SetupStatusBar();
+    void SetupKeyBindings();
+    void SetupGamepad();
     void SetDisplayScale(int scale);
 
     AbsEmulator *emulator = nullptr;
@@ -56,6 +60,10 @@ protected:
 
     LogWindow *logWindow = nullptr;
     QAction *displayLogWindowAction = nullptr;
+
+    QHash<Qt::Key, Buttons::Button> keyboardBindings;
+    QHash<QGamepadManager::GamepadButton, Buttons::Button> gamepadBindings;
+    QGamepad *gamepad = nullptr;
 
 signals:
     void SignalFrameReady();

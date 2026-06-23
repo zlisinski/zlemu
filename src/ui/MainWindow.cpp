@@ -36,6 +36,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     SetupMenuBar();
     SetupStatusBar();
+    SetupKeyBindings();
+    SetupGamepad();
 
     graphicsView = new QGraphicsView(this);
     graphicsView->setFrameStyle(QFrame::NoFrame);
@@ -179,13 +181,21 @@ void MainWindow::UpdateRecentFilesActions()
 
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
-    QMainWindow::keyPressEvent(event);
+    Buttons::Button button = keyboardBindings.value(static_cast<Qt::Key>(event->key()), Buttons::Button::eButtonNone);
+    if (button != Buttons::Button::eButtonNone)
+        emulator->ButtonPressed(button);
+    else
+        QMainWindow::keyPressEvent(event);
 }
 
 
 void MainWindow::keyReleaseEvent(QKeyEvent *event)
 {
-    QMainWindow::keyReleaseEvent(event);
+    Buttons::Button button = keyboardBindings.value(static_cast<Qt::Key>(event->key()), Buttons::Button::eButtonNone);
+    if (button != Buttons::Button::eButtonNone)
+        emulator->ButtonReleased(button);
+    else
+        QMainWindow::keyReleaseEvent(event);
 }
 
 
@@ -293,6 +303,58 @@ void MainWindow::SetupStatusBar()
     labelPause = new QLabel("", this);
     statusBar()->addPermanentWidget(labelFps);
     statusBar()->addPermanentWidget(labelPause);
+}
+
+
+void MainWindow::SetupKeyBindings()
+{
+    keyboardBindings = {
+        {settings.sms.keyUp, Buttons::eButtonUp},
+        {settings.sms.keyDown, Buttons::eButtonDown},
+        {settings.sms.keyLeft, Buttons::eButtonLeft},
+        {settings.sms.keyRight, Buttons::eButtonRight},
+        {settings.sms.keyButton1, Buttons::eButton1},
+        {settings.sms.keyButton2, Buttons::eButton2},
+        {settings.sms.keyPause, Buttons::eButtonPause}
+    };
+
+    gamepadBindings = {
+        {settings.sms.padUp, Buttons::eButtonUp},
+        {settings.sms.padDown, Buttons::eButtonDown},
+        {settings.sms.padLeft, Buttons::eButtonLeft},
+        {settings.sms.padRight, Buttons::eButtonRight},
+        {settings.sms.padButton1, Buttons::eButton1},
+        {settings.sms.padButton2, Buttons::eButton2},
+        {settings.sms.padPause, Buttons::eButtonPause}
+    };
+}
+
+
+void MainWindow::SetupGamepad()
+{
+    QList<int> gamepads = QGamepadManager::instance()->connectedGamepads();
+    if (gamepads.isEmpty())
+        return;
+
+    gamepad = new QGamepad(*gamepads.begin(), this);
+
+    connect(QGamepadManager::instance(), &QGamepadManager::gamepadButtonPressEvent, this,
+        [this](int deviceId, QGamepadManager::GamepadButton gamepadButton, double value)
+        {
+            Q_UNUSED(deviceId);
+            Q_UNUSED(value);
+            Buttons::Button button = gamepadBindings.value(gamepadButton, Buttons::Button::eButtonNone);
+            if (button != Buttons::Button::eButtonNone)
+                emulator->ButtonPressed(button);
+        });
+    connect(QGamepadManager::instance(), &QGamepadManager::gamepadButtonReleaseEvent, this,
+        [this](int deviceId, QGamepadManager::GamepadButton gamepadButton)
+        {
+            Q_UNUSED(deviceId);
+            Buttons::Button button = gamepadBindings.value(gamepadButton, Buttons::Button::eButtonNone);
+            if (button != Buttons::Button::eButtonNone)
+                emulator->ButtonReleased(button);
+        });
 }
 
 

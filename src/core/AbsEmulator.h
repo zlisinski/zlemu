@@ -2,7 +2,7 @@
 #define ZLEMU_CORE_ABSEMULATOR_H
 
 
-#include <string_view>
+#include "Buttons.h"
 
 
 class AbsEmulator
@@ -16,6 +16,8 @@ public:
     virtual void EndEmulation() = 0;
     virtual void Reset() = 0;
     virtual void Pause(bool pause) = 0;
+    virtual void ButtonPressed(Buttons::Button button) = 0;
+    virtual void ButtonReleased(Buttons::Button button) = 0;
 };
 
 
