@@ -1028,7 +1028,6 @@ inline void Z80::LogState() const
 template <bool IsCB>
 void Z80::ReadArgsAndLog(const OpcodeInfo &opcode)
 {
-    operandCount = 0;
     cycles = opcode.cycles;
 
     switch (opcode.argType)
@@ -1090,6 +1089,7 @@ void Z80::CheckInterrupt()
 
 void Z80::Cycle()
 {
+    operandCount = 0;
     cycles = 0;
 
     CheckInterrupt();
