@@ -1,2 +1,3 @@
 add_subdirectory(CpuBenchmark)
+add_subdirectory(MemoryTest)
 add_subdirectory(Z80Test)

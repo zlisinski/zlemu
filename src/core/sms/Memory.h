@@ -46,16 +46,20 @@ public:
     void SetMemoryControlRegister(uint8_t value);
 
 protected:
-    void MapPage(uint8_t dest, uint8_t src);
+    void MapRomBank(uint8_t dest, uint8_t src);
+    void MapSram(bool enabled);
 
     std::array<uint8_t, 0xC000> memory;
     std::array<uint8_t, 0x2000> wram = {0};
+    std::array<uint8_t, 0x8000> sram = {0};
     std::vector<uint8_t> bios;
     std::vector<uint8_t> rom;
 
     uint8_t memoryControlRegister = 0;
     bool isCartEnabled = false;
     bool isBiosEnabled = false;
+    bool isSramEnabled = false;
+    uint8_t currentSramBank = 0;
 };
 
 
