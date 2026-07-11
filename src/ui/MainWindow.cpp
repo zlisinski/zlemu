@@ -9,6 +9,7 @@
 #include "LogWindow.h"
 #include "MainWindow.h"
 #include "Settings.h"
+#include "SettingsDialog.h"
 #include "UiUtils.h"
 
 
@@ -232,7 +233,14 @@ void MainWindow::SetupMenuBar()
     UpdateRecentFilesActions();
 
     fileMenu->addSeparator();
-    fileMenu->addAction("&Settings...", []{});
+    fileMenu->addAction("&Settings...", [this]
+    {
+        SettingsDialog dialog(this);
+        dialog.setModal(true);
+        dialog.exec();
+
+        SetupKeyBindings();
+    });
     fileMenu->addSeparator();
     fileMenu->addAction("&Quit", [this]{this->close();});
 
