@@ -101,7 +101,7 @@ void LogWindow::SlotOutputMessage()
             printf("%s.%06ld: %s\n", timeBuf, entry->tv.tv_usec, entry->message.c_str());
             ui->txtOutput->append(QStringLiteral("%1.%2: %3")
                 .arg(timeBuf)
-                .arg(entry->tv.tv_usec, 6, QChar('0'))
+                .arg(entry->tv.tv_usec, 6, 10, QChar('0'))
                 .arg(entry->message.c_str()));
         }
     }
