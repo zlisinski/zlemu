@@ -12,7 +12,7 @@ namespace Sms
 class Input
 {
 public:
-    Input();
+    Input(bool isJapanese);
 
     void SetButtons(const Buttons &buttons) {this->buttons = buttons;}
     void SetEnabled(bool enabled) {isEnabled = enabled;}
@@ -25,6 +25,17 @@ protected:
     Buttons buttons;
     bool isEnabled = true;
     uint8_t ioControlRegister = 0;
+
+    bool thALevel = false;
+    bool thBLevel = false;
+    bool trALevel = false;
+    bool trBLevel = false;
+    bool thAInput = false;
+    bool thBInput = false;
+    bool trAInput = false;
+    bool trBInput = false;
+
+    bool isJapanese = false;
 };
 
 

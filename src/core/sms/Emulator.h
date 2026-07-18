@@ -5,6 +5,8 @@
 
 #include <core/AbsEmulator.h>
 #include <core/Buttons.h>
+#include <core/Region.h>
+#include "Cartridge.h"
 
 
 class DisplayInterface;
@@ -29,6 +31,7 @@ public:
 
     void SetBios(std::vector<uint8_t> data) override;
     void SetRom(std::vector<uint8_t> data) override;
+    void SetRegion(ERegion region) override {this->region = region;}
     bool StartEmulation() override;
     void EndEmulation() override;
     void Reset() override {}
@@ -38,6 +41,7 @@ public:
 
 protected:
     void ThreadFunc();
+    bool IsJapanese() const;
 
     volatile bool paused = false;
     volatile bool quit = false;
@@ -45,7 +49,7 @@ protected:
     std::thread workThread;
 
     std::vector<uint8_t> bios;
-    std::vector<uint8_t> rom;
+    Cartridge cartridge;
 
     Bus *bus = nullptr;
     Buttons buttons;
@@ -57,6 +61,8 @@ protected:
     Z80 *cpu = nullptr;
 
     DisplayInterface *displayInterface = nullptr;
+
+    ERegion region = ERegion::AutoDetect;
 };
 
 

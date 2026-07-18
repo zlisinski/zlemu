@@ -148,6 +148,7 @@ void MainWindow::OpenRom(QString filename, bool saveToRecent)
         QByteArray byteArray = file.readAll();
         file.close();
         emulator->SetRom(std::vector<uint8_t>(byteArray.begin(), byteArray.end()));
+        emulator->SetRegion(settings.sms.region);
 
         if (!emulator->StartEmulation())
         {

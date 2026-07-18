@@ -36,13 +36,13 @@ void Emulator::SetBios(std::vector<uint8_t> data)
 
 void Emulator::SetRom(std::vector<uint8_t> data)
 {
-    rom = std::move(data);
+    cartridge.Load(std::move(data));
 }
 
 
 bool Emulator::StartEmulation()
 {
-    if (rom.empty())
+    if (!cartridge.IsLoaded())
     {
         LogError("No ROM loaded");
         return false;
@@ -50,7 +50,7 @@ bool Emulator::StartEmulation()
 
     EndEmulation();
 
-    input = new Input();
+    input = new Input(IsJapanese());
     interrupt = new Interrupt();
     vdp = new Vdp(interrupt, displayInterface);
     memory = new Memory();
@@ -60,7 +60,7 @@ bool Emulator::StartEmulation()
 
     if (!bios.empty())
         memory->SetBios(bios);
-    memory->SetRom(rom);
+    memory->SetRom(cartridge.GetRom());
     memory->Reset();
 
     workThread = std::thread(&Emulator::ThreadFunc, this);
@@ -132,6 +132,33 @@ void Emulator::ThreadFunc()
     memory = nullptr;
     timer = nullptr;
     vdp = nullptr;
+}
+
+
+bool Emulator::IsJapanese() const
+{
+    switch (region)
+    {
+        case ERegion::AutoDetect:
+            switch (cartridge.GetRegion())
+            {
+                case Cartridge::ERegion::SmsExport:
+                case Cartridge::ERegion::GgExport:
+                case Cartridge::ERegion::GgInternational:
+                    return false;
+                case Cartridge::ERegion::Unknown:
+                case Cartridge::ERegion::SmsJapan:
+                case Cartridge::ERegion::GgJapan:
+                    return true;
+            }
+            break;
+        case ERegion::Export:
+            return false;
+        case ERegion::Japan:
+            return true;
+    }
+
+    return false;
 }
 
 

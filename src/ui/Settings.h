@@ -5,6 +5,8 @@
 #include <QGamepadManager>
 #include <QString>
 
+#include "../core/Region.h"
+
 
 struct Settings
 {
@@ -45,8 +47,12 @@ struct Settings
         QGamepadManager::GamepadButton padButton1;
         QGamepadManager::GamepadButton padButton2;
         QGamepadManager::GamepadButton padPause;
+
+        ERegion region;
     } sms;
 };
+
+Q_DECLARE_METATYPE(ERegion);
 
 
 #endif

@@ -4,6 +4,8 @@
 #include "KeyBindingDialog.h"
 #include "Settings.h"
 #include "SettingsDialog.h"
+
+#include "Settings.h"
 #include "ui_SettingsDialog.h"
 
 extern Settings settings;
@@ -87,6 +89,19 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
         connect(button, &QPushButton::clicked, this, &SettingsDialog::onInputBindKey);
     for (QPushButton *button : padButtons)
         connect(button, &QPushButton::clicked, this, &SettingsDialog::onInputBindPad);
+
+    switch (settings.sms.region)
+    {
+        case ERegion::AutoDetect:
+            ui->rbRegionAutoDetect->setChecked(true);
+            break;
+        case ERegion::Export:
+            ui->rbRegionExport->setChecked(true);
+            break;
+        case ERegion::Japan:
+            ui->rbRegionJapan->setChecked(true);
+            break;
+    }
 }
 
 
@@ -137,6 +152,13 @@ void SettingsDialog::SaveSettings()
     settings.sms.padButton1 = padBindings[Buttons::eButton1];
     settings.sms.padButton2 = padBindings[Buttons::eButton2];
     settings.sms.padPause = padBindings[Buttons::eButtonPause];
+
+    if (ui->rbRegionAutoDetect->isChecked())
+        settings.sms.region = ERegion::AutoDetect;
+    else if (ui->rbRegionExport->isChecked())
+        settings.sms.region = ERegion::Export;
+    else if (ui->rbRegionJapan->isChecked())
+        settings.sms.region = ERegion::Japan;
 
     settings.Save();
 }

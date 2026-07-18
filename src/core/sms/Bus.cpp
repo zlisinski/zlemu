@@ -20,7 +20,7 @@ Bus::Bus(Input *input, Memory *memory, Vdp *vdp) :
 
 uint8_t Bus::ReadPort(uint8_t port) const
 {
-    LogMemory("ReadPort(%02X)", port);
+    LogInput("ReadPort(%02X)", port);
 
     switch (port & 0xC1)
     {
@@ -54,13 +54,16 @@ uint8_t Bus::ReadPort(uint8_t port) const
 
 void Bus::WritePort(uint8_t port, uint8_t value)
 {
-    LogMemory("WritePort(%02X, %02X)", port, value);
+    LogInput("WritePort(%02X, %02X)", port, value);
 
     switch (port & 0xC1)
     {
         case 0x00: // 0x00-0x3E even
             memory->SetMemoryControlRegister(value);
-            input->SetEnabled(Bytes::TestBit<2>(value));
+            input->SetEnabled(!Bytes::TestBit<2>(value));
+            LogInput("MemoryControlRegister=%02X Exp=%d Cart=%d Card=%d Wram=%d Bios=%d IO=%d", value,
+                     !Bytes::TestBit<7>(value), !Bytes::TestBit<6>(value), !Bytes::TestBit<5>(value),
+                     !Bytes::TestBit<4>(value), !Bytes::TestBit<3>(value), !Bytes::TestBit<2>(value));
             break;
 
         case 0x01: // 0x01-0x3F odd

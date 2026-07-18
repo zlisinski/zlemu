@@ -3,6 +3,7 @@
 
 
 #include "Buttons.h"
+#include "Region.h"
 
 
 class AbsEmulator
@@ -12,6 +13,7 @@ public:
 
     virtual void SetBios(std::vector<uint8_t> data) = 0;
     virtual void SetRom(std::vector<uint8_t> data) = 0;
+    virtual void SetRegion(ERegion region) = 0;
     virtual bool StartEmulation() = 0;
     virtual void EndEmulation() = 0;
     virtual void Reset() = 0;

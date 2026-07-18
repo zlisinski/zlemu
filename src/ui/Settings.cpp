@@ -37,6 +37,7 @@ void Settings::Load()
     sms.padButton1 = settings.value("Input/PadButton1").value<QGamepadManager::GamepadButton>();
     sms.padButton2 = settings.value("Input/PadButton2").value<QGamepadManager::GamepadButton>();
     sms.padPause = settings.value("Input/PadPause").value<QGamepadManager::GamepadButton>();
+    sms.region = settings.value("Region").value<ERegion>();
     settings.endGroup();
 }
 
@@ -75,5 +76,6 @@ void Settings::Save() const
     settings.setValue("Input/PadButton1", sms.padButton1);
     settings.setValue("Input/PadButton2", sms.padButton2);
     settings.setValue("Input/PadPause", sms.padPause);
+    settings.setValue("Region", static_cast<int>(sms.region));
     settings.endGroup();
 }
