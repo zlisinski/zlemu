@@ -334,6 +334,13 @@ void Vdp::DrawScanline(uint16_t scanline)
 
 void Vdp::DrawBackground(uint16_t scanline)
 {
+    if (!isDisplayEnabled)
+    {
+        for (int i = 0; i < 256; i++)
+            frameBuffer[(scanline * 256) + i] = 0;
+        return;
+    }
+
     uint8_t y = (scanline + regYScroll) % 224;
     uint8_t yTile = y / 8;
 
