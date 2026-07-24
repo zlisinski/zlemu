@@ -344,7 +344,17 @@ void Vdp::DrawBackground(uint16_t scanline)
     uint8_t y = (scanline + regYScroll) % 224;
     uint8_t yTile = y / 8;
 
-    for (int i = 0; i < 256; i++)
+    int i = 0;
+    if (isMaskCol0)
+    {
+        for (i = 0; i < 8; i++)
+        {
+            uint8_t color = cram[(regOverscanColor & 0x0F) + 16];
+            frameBuffer[(scanline * 256) + i] = ColorTable[color];
+        }
+    }
+
+    for (; i < 256; i++)
     {
         uint8_t x = isTopStatusBar && scanline < 16 ? i : (i - regXScroll) & 0xFF;
         uint8_t xTile = x / 8;
