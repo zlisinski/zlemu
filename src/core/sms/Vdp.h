@@ -36,7 +36,6 @@ protected:
     uint8_t GetSpritePixelColor(uint8_t x, uint8_t y);
     void LoadNextSprites(uint16_t scanline);
     void DrawScanline(uint16_t scanline);
-    void DrawBackground(uint16_t scanline);
 
     enum class ECode
     {

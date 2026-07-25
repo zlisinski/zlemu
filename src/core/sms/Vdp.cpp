@@ -62,6 +62,7 @@ void Vdp::Run(uint32_t masterClocks)
         if (vPosition <= 192)
         {
             DrawScanline(vPosition - 1);
+            LoadNextSprites(vPosition);
         }
         else if (vPosition == 193)
         {
@@ -83,6 +84,8 @@ void Vdp::Run(uint32_t masterClocks)
         {
             // Exit vblank
             vPosition = 0;
+            // Load sprites for the next scanline, which is 0.
+            LoadNextSprites(0);
         }
     }
 }
@@ -176,7 +179,7 @@ void Vdp::WriteControl(uint8_t data)
                 isFrameIntEnabled = Bytes::TestBit<5>(regModeControl2);
                 isModeM1 = Bytes::TestBit<4>(regModeControl2);
                 isModeM3 = Bytes::TestBit<3>(regModeControl2);
-                spriteHeight = 8 + (8 * Bytes::TestBit<1>(regModeControl2));
+                spriteHeight = 8 << Bytes::TestBit<1>(regModeControl2);
                 isSpriteDoubleSize = Bytes::TestBit<0>(regModeControl2);
 
                 // Clearing the IE bit clears any pending interrupts.
@@ -270,11 +273,11 @@ uint8_t Vdp::GetSpritePixelColor(uint8_t x, uint8_t y)
         int spriteShift = isShiftSprites * -8;
         int spriteX = sprites[i].x + spriteShift;
 
-        if (x < spriteX || x >= spriteX + 8)
+        if (x < spriteX || x >= spriteX + (8 << isSpriteDoubleSize))
             continue;
 
-        uint8_t xOffset = x - spriteX;
-        uint8_t yOffset = y - sprites[i].y - 1;
+        uint8_t xOffset = (x - spriteX) >> isSpriteDoubleSize;
+        uint8_t yOffset = (y - sprites[i].y) >> isSpriteDoubleSize;
         uint16_t tileIndex = (spritePatternHighBit << 8) | sprites[i].tile;
 
         uint8_t colorIndex = GetPixelColor(tileIndex, xOffset, yOffset);
@@ -298,22 +301,24 @@ uint8_t Vdp::GetSpritePixelColor(uint8_t x, uint8_t y)
 void Vdp::LoadNextSprites(uint16_t scanline)
 {
     spriteCount = 0;
-    uint8_t *data = &vram[spriteAttributeBaseAddr];
+    const uint8_t *dataY = &vram[spriteAttributeBaseAddr];
+    const uint8_t *dataXT = &vram[spriteAttributeBaseAddr + 0x80];
 
     for (int i = 0; i < 64; i++)
     {
-        uint8_t spriteY = data[i];
+        // Sprite Y values are stored as value-1.
+        uint8_t spriteY = dataY[i] + 1;
 
-        if (screenHeight == 192 && spriteY == 0xD0)
+        if (screenHeight == 192 && spriteY == 0xD1)
             break;
 
-        if (scanline < spriteY || scanline >= spriteY + spriteHeight)
+        if (scanline < spriteY || scanline >= spriteY + (spriteHeight << isSpriteDoubleSize))
             continue;
 
         if (spriteCount < 8)
         {
-            uint8_t spriteX = data[0x80 + (i * 2)];
-            uint8_t spriteTile = data[0x80 + (i * 2) + 1];
+            uint8_t spriteX = dataXT[(i * 2)];
+            uint8_t spriteTile = dataXT[(i * 2) + 1];
             sprites[spriteCount++] = {spriteY, spriteX, spriteTile};
         }
         else
@@ -326,13 +331,6 @@ void Vdp::LoadNextSprites(uint16_t scanline)
 
 
 void Vdp::DrawScanline(uint16_t scanline)
-{
-    DrawBackground(scanline);
-    LoadNextSprites(scanline);
-}
-
-
-void Vdp::DrawBackground(uint16_t scanline)
 {
     if (!isDisplayEnabled)
     {
