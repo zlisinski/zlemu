@@ -180,6 +180,7 @@ void Vdp::WriteControl(uint8_t data)
                 isModeM1 = Bytes::TestBit<4>(regModeControl2);
                 isModeM3 = Bytes::TestBit<3>(regModeControl2);
                 spriteHeight = 8 << Bytes::TestBit<1>(regModeControl2);
+                isTallSprites = Bytes::TestBit<1>(regModeControl2);
                 isSpriteDoubleSize = Bytes::TestBit<0>(regModeControl2);
 
                 // Clearing the IE bit clears any pending interrupts.
@@ -279,6 +280,9 @@ uint8_t Vdp::GetSpritePixelColor(uint8_t x, uint8_t y)
         uint8_t xOffset = (x - spriteX) >> isSpriteDoubleSize;
         uint8_t yOffset = (y - sprites[i].y) >> isSpriteDoubleSize;
         uint16_t tileIndex = (spritePatternHighBit << 8) | sprites[i].tile;
+
+        // Tall sprites always start on an even tile.
+        tileIndex &= ~((uint16_t)isTallSprites);
 
         uint8_t colorIndex = GetPixelColor(tileIndex, xOffset, yOffset);
         if (colorIndex != 0)

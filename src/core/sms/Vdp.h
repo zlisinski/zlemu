@@ -96,6 +96,7 @@ protected:
     bool isModeM1 = false;
     bool isModeM3 = false;
     uint8_t spriteHeight = 8;
+    bool isTallSprites = false;
     bool isSpriteDoubleSize = false;
 
     uint16_t nameTableBaseAddr = 0x3800;
