@@ -381,7 +381,7 @@ void Vdp::DrawScanline(uint16_t scanline)
         uint8_t colorIndex = GetPixelColor(tileIndex, xOffset, yOffset);
         uint8_t spriteColorIndex = GetSpritePixelColor(i, scanline);
 
-        if (spriteColorIndex != 0xFF && !bgPriority)
+        if (spriteColorIndex != 0xFF && (!bgPriority || colorIndex == 0))
         {
             colorIndex = spriteColorIndex;
             highPalette = true;
