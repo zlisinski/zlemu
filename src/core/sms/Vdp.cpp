@@ -59,9 +59,14 @@ void Vdp::Run(uint32_t masterClocks)
         vPosition++;
         vCounter++;
 
+        xScrollLatch = regXScroll;
+
         if (vPosition <= 192)
         {
-            DrawScanline(vPosition - 1);
+            if (isSideStatusBar)
+                DrawScanline<true>(vPosition - 1);
+            else
+                DrawScanline<false>(vPosition - 1);
             LoadNextSprites(vPosition);
         }
         else if (vPosition == 193)
@@ -86,6 +91,8 @@ void Vdp::Run(uint32_t masterClocks)
             vPosition = 0;
             // Load sprites for the next scanline, which is 0.
             LoadNextSprites(0);
+
+            yScrollLatch = regYScroll;
         }
     }
 }
@@ -334,6 +341,7 @@ void Vdp::LoadNextSprites(uint16_t scanline)
 }
 
 
+template <bool SideStatusBar>
 void Vdp::DrawScanline(uint16_t scanline)
 {
     if (!isDisplayEnabled)
@@ -342,9 +350,6 @@ void Vdp::DrawScanline(uint16_t scanline)
             frameBuffer[(scanline * 256) + i] = 0;
         return;
     }
-
-    uint8_t y = (scanline + regYScroll) % 224;
-    uint8_t yTile = y / 8;
 
     int i = 0;
     if (isMaskCol0)
@@ -356,12 +361,25 @@ void Vdp::DrawScanline(uint16_t scanline)
         }
     }
 
+    uint8_t y = (scanline + yScrollLatch) % 224;
+    uint8_t yTile = y / 8;
+    uint8_t yOffset = y & 7;
+
     for (; i < 256; i++)
     {
         uint8_t x = isTopStatusBar && scanline < 16 ? i : (i - regXScroll) & 0xFF;
         uint8_t xTile = x / 8;
         uint8_t xOffset = x & 7;
-        uint8_t yOffset = y & 7;
+
+        if constexpr (SideStatusBar)
+        {
+            if (i == 192)
+            {
+                y = scanline;
+                yTile = y / 8;
+                yOffset = y & 7;
+            }
+        }
 
         uint16_t addr = nameTableBaseAddr | (yTile << 6) | (xTile << 1);
         uint16_t tileIndex = vram[addr];

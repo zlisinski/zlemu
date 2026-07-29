@@ -35,6 +35,7 @@ protected:
     uint8_t GetPixelColor(uint16_t tile, uint8_t x, uint8_t y) const;
     uint8_t GetSpritePixelColor(uint8_t x, uint8_t y);
     void LoadNextSprites(uint16_t scanline);
+    template <bool SideStatusBar=false>
     void DrawScanline(uint16_t scanline);
 
     enum class ECode
@@ -67,8 +68,8 @@ protected:
     ECode codeRegister = ECode::ReadVram;
     uint16_t addressRegister = 0;
 
-    uint8_t regModeControl1 = 0;                 // 0x00
-    uint8_t regModeControl2 = 0;                 // 0x01
+    uint8_t regModeControl1 = 0x36;              // 0x00
+    uint8_t regModeControl2 = 0xA0;              // 0x01
     uint8_t regNameTableBaseAddr = 0xFF;         // 0x02
     uint8_t regColorTableBaseAddr = 0xFF;        // 0x03
     uint8_t regBackgroundPatternBaseAddr = 0xFF; // 0x04
@@ -77,7 +78,7 @@ protected:
     uint8_t regOverscanColor = 0;                // 0x07
     uint8_t regXScroll = 0;                      // 0x08
     uint8_t regYScroll = 0;                      // 0x09
-    uint8_t regLineCounter = 255;                // 0x0A
+    uint8_t regLineCounter = 0xFF;               // 0x0A
 
     uint8_t screenHeight = 192;
 
@@ -102,6 +103,9 @@ protected:
     uint16_t nameTableBaseAddr = 0x3800;
     uint16_t spriteAttributeBaseAddr = 0x3F00;
     bool spritePatternHighBit = false;
+
+    uint8_t xScrollLatch = 0;
+    uint8_t yScrollLatch = 0;
 
     struct Sprite
     {
