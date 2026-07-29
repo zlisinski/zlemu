@@ -107,6 +107,8 @@ protected:
     uint8_t xScrollLatch = 0;
     uint8_t yScrollLatch = 0;
 
+    uint8_t lineIntCounter = 0;
+
     struct Sprite
     {
         uint8_t y;

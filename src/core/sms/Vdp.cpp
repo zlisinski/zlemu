@@ -63,6 +63,20 @@ void Vdp::Run(uint32_t masterClocks)
 
         if (vPosition <= 192)
         {
+            lineIntCounter--;
+            if (lineIntCounter == 0xFF)
+            {
+                lineIntCounter = regLineCounter;
+                interrupt->RequestInterrupt();
+            }
+        }
+        else
+        {
+            lineIntCounter = regLineCounter;
+        }
+
+        if (vPosition <= 192)
+        {
             if (isSideStatusBar)
                 DrawScanline<true>(vPosition - 1);
             else
