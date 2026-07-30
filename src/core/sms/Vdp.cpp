@@ -154,16 +154,15 @@ void Vdp::WriteControl(uint8_t data)
 {
     if (firstByte)
     {
-        commandWord = (commandWord & 0xFF00) | data;
+        addressRegister = (addressRegister & 0x3F00) | data;
         firstByte = false;
         return;
     }
 
-    commandWord = (data << 8) | (commandWord & 0xFF);
     firstByte = true;
 
-    codeRegister = static_cast<ECode>(commandWord >> 14);
-    addressRegister = commandWord & 0x3FFF;
+    addressRegister = ((data & 0x3F) << 8) | (addressRegister & 0xFF);
+    codeRegister = static_cast<ECode>(data >> 6);
 
     if (codeRegister == ECode::ReadVram)
     {
