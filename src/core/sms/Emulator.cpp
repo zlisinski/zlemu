@@ -50,9 +50,9 @@ bool Emulator::StartEmulation()
 
     EndEmulation();
 
-    input = new Input(IsJapanese());
     interrupt = new Interrupt();
     vdp = new Vdp(interrupt, displayInterface);
+    input = new Input(vdp, IsJapanese());
     memory = new Memory();
     bus = new Bus(input, memory, vdp);
     timer = new Timer(vdp);

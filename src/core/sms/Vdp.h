@@ -21,6 +21,7 @@ public:
 
     void Run(uint32_t masterClocks);
 
+    void LatchHCounter();
     uint8_t GetHCounter() const {return hCounter;}
     uint8_t GetVCounter() const {return vCounter;}
 

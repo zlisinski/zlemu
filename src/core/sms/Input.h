@@ -8,11 +8,13 @@
 namespace Sms
 {
 
+class Vdp;
+
 
 class Input
 {
 public:
-    Input(bool isJapanese);
+    Input(Vdp *vdp, bool isJapanese);
 
     void SetButtons(const Buttons &buttons) {this->buttons = buttons;}
     void SetEnabled(bool enabled) {isEnabled = enabled;}
@@ -36,6 +38,8 @@ protected:
     bool trBInput = false;
 
     bool isJapanese = false;
+
+    Vdp *vdp = nullptr;
 };
 
 

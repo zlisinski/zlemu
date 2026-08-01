@@ -1,4 +1,5 @@
 #include "Input.h"
+#include "Vdp.h"
 
 #include <core/Bytes.h>
 #include <core/Logger.h>
@@ -8,8 +9,9 @@ namespace Sms
 {
 
 
-Input::Input(bool isJapanese) :
-    isJapanese(isJapanese)
+Input::Input(Vdp *vdp, bool isJapanese) :
+    isJapanese(isJapanese),
+    vdp(vdp)
 {
 
 }
@@ -17,6 +19,9 @@ Input::Input(bool isJapanese) :
 
 void Input::SetIoControlRegister(uint8_t value)
 {
+    bool oldThALevel = thALevel;
+    bool oldThBLevel = thBLevel;
+
     ioControlRegister = value;
     thBLevel = Bytes::GetBit<7>(value);
     trBLevel = Bytes::GetBit<6>(value);
@@ -26,6 +31,9 @@ void Input::SetIoControlRegister(uint8_t value)
     trBInput = Bytes::GetBit<2>(value);
     thAInput = Bytes::GetBit<1>(value);
     trAInput = Bytes::GetBit<0>(value);
+
+    if ((oldThALevel == 0 && thALevel == 1) || (oldThBLevel == 0 && thBLevel == 1))
+        vdp->LatchHCounter();
 
     const char *level[] = {"Low", "High"};
     const char *dir[] = {"Out", "In"};

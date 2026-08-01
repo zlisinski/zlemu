@@ -34,28 +34,13 @@ void Vdp::Run(uint32_t masterClocks)
     mclks += masterClocks;
 
     // VDP runs at half the master clock.
-    uint16_t oldHPosition = hPosition;
     hPosition = mclks / 2;
-
-    // hCounter is the top 8 bits of a 9 bit counter.
-    hCounter = hPosition >> 1;
-
-    if (hPosition >= 279)
-    {
-        // Counter jumps forward for some reason.
-        hCounter += 84;
-
-        if (oldHPosition < 279)
-        {
-            // Enter hblank
-        }
-    }
 
     if (hPosition >= 342)
     {
         // Reset mclks counter, but keep remainder.
-        mclks &= 0x01;
-        hPosition = 0;
+        mclks -= 684;
+        hPosition = mclks / 2;
         vPosition++;
         vCounter++;
 
@@ -108,6 +93,19 @@ void Vdp::Run(uint32_t masterClocks)
 
             yScrollLatch = regYScroll;
         }
+    }
+}
+
+
+void Vdp::LatchHCounter()
+{
+    // hCounter is the top 8 bits of a 9 bit counter.
+    hCounter = hPosition >> 1;
+
+    if (hCounter > 147)
+    {
+        // Counter jumps forward for some reason.
+        hCounter += 85;
     }
 }
 
