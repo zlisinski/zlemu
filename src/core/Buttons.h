@@ -29,6 +29,11 @@ public:
     bool IsButton2Pressed() const {return data & eButton2;}
     bool IsPausePressed() const {return data & eButtonPause;}
 
+    void SetButton(Button button) {data |= button;}
+    void ClearButton(Button button) {data &= ~button;}
+
+    bool operator==(const Buttons &other) const {return data == other.data;}
+
     uint8_t data;
 };
 

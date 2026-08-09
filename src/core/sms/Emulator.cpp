@@ -81,20 +81,26 @@ void Emulator::EndEmulation()
 
 void Emulator::ButtonPressed(Buttons::Button button)
 {
-    uint8_t oldButtonData = buttons.data;
-    buttons.data |= button;
+    Buttons oldButtons = buttons;
+    buttons.SetButton(button);
 
-    if (input && buttons.data != oldButtonData)
+    if (interrupt && buttons.IsPausePressed() && !oldButtons.IsPausePressed())
+    {
+        interrupt->RequestNmi();
+        return;
+    }
+
+    if (input && buttons != oldButtons)
         input->SetButtons(buttons);
 }
 
 
 void Emulator::ButtonReleased(Buttons::Button button)
 {
-    uint8_t oldButtonData = buttons.data;
-    buttons.data &= ~button;
+    Buttons oldButtons = buttons;
+    buttons.ClearButton(button);
 
-    if (input && buttons.data != oldButtonData)
+    if (input && buttons != oldButtons)
         input->SetButtons(buttons);
 }
 

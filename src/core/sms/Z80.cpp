@@ -1069,9 +1069,22 @@ void Z80::ReadArgsAndLog(const OpcodeInfo &opcode)
 
 void Z80::CheckInterrupt()
 {
-    if (!ei && iff1 && interrupt->CheckInterrupt())
+    if (interrupt->IsNmi())
     {
-        LogCpu("Processing interrupt");
+        LogCpu("Processing NMI");
+        timer->AddCycles(6);
+        halted = false;
+        iff1 = false;
+
+        Push(reg.pc);
+        reg.wz = 0x0066;
+        reg.pc = reg.wz;
+
+        interrupt->ClearNmi();
+    }
+    else if (!ei && iff1 && interrupt->IsIrq())
+    {
+        LogCpu("Processing IRQ");
         timer->AddCycles(6);
         halted = false;
         iff1 = false;

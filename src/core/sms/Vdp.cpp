@@ -52,7 +52,7 @@ void Vdp::Run(uint32_t masterClocks)
             if (lineIntCounter == 0xFF)
             {
                 lineIntCounter = regLineCounter;
-                interrupt->RequestInterrupt();
+                interrupt->RequestIrq();
             }
         }
         else
@@ -76,7 +76,7 @@ void Vdp::Run(uint32_t masterClocks)
             Bytes::SetBit<7>(statusRegister);
             if (Bytes::TestBit<5>(regModeControl2))
             {
-                interrupt->RequestInterrupt();
+                interrupt->RequestIrq();
             }
         }
         else if (vPosition == 219)
@@ -142,7 +142,7 @@ uint8_t Vdp::ReadControl()
 
     uint8_t data = statusRegister;
     statusRegister = 0;
-    interrupt->ClearInterrupt();
+    interrupt->ClearIrq();
 
     return data;
 }
@@ -203,7 +203,7 @@ void Vdp::WriteControl(uint8_t data)
 
                 // Clearing the IE bit clears any pending interrupts.
                 if (!Bytes::TestBit<5>(regModeControl2))
-                    interrupt->ClearInterrupt();
+                    interrupt->ClearIrq();
 
                 LogDisplay("DisplayOn=%d FrameInt=%d M1=%d M3=%d SpriteHeight=%d 2xSprite=%d",
                     isDisplayEnabled, isFrameIntEnabled, isModeM1, isModeM3, spriteHeight, isSpriteDoubleSize);

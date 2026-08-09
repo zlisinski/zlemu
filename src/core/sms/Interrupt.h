@@ -8,12 +8,19 @@ namespace Sms
 class Interrupt
 {
 public:
-    void RequestInterrupt() {isIrq = true;}
-    void ClearInterrupt() {isIrq = false;}
-    bool CheckInterrupt() const {return isIrq;}
+    void RequestIrq() {isIrq = true;}
+    void ClearIrq() {isIrq = false;}
+    bool IsIrq() const {return isIrq;}
+
+    void RequestNmi() {isNmi = true;}
+    void ClearNmi() {isNmi = false;}
+    bool IsNmi() const {return isNmi;}
+
+    bool CheckInterrupt() const {return isIrq || isNmi;}
 
 protected:
     bool isIrq = false;
+    bool isNmi = false;
 };
 
 
