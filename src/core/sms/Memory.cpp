@@ -33,7 +33,11 @@ void Memory::WriteByte(uint16_t addr, uint8_t value)
     if (addr < 0xC000)
     {
         if (addr < 0x8000 || !isSramEnabled)
-            throw std::runtime_error(std::format("Write to ROM {:04X} {:02X}", addr, value));
+        {
+            //throw std::runtime_error(std::format("Write to ROM {:04X} {:02X}", addr, value));
+            LogWarning("Write to ROM %04X %02X", addr, value);
+            return;
+        }
         this->memory[addr] = value;
         return;
     }
