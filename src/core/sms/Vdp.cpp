@@ -379,13 +379,13 @@ void Vdp::DrawScanline(uint16_t scanline)
 
     uint8_t y = (scanline + yScrollLatch) % 224;
     uint8_t yTile = y / 8;
-    uint8_t yOffset = y & 7;
 
     for (; i < 256; i++)
     {
         uint8_t x = isTopStatusBar && scanline < 16 ? i : (i - regXScroll) & 0xFF;
         uint8_t xTile = x / 8;
         uint8_t xOffset = x & 7;
+        uint8_t yOffset = y & 7;
 
         if constexpr (SideStatusBar)
         {
