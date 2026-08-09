@@ -52,7 +52,11 @@ void Vdp::Run(uint32_t masterClocks)
             if (lineIntCounter == 0xFF)
             {
                 lineIntCounter = regLineCounter;
-                interrupt->RequestIrq();
+                if (isLineIntEnabled)
+                {
+                    LogInterrupt("Requesting frame IRQ");
+                    interrupt->RequestIrq();
+                }
             }
         }
         else
@@ -74,8 +78,9 @@ void Vdp::Run(uint32_t masterClocks)
             displayInterface->FrameReady(frameBuffer);
 
             Bytes::SetBit<7>(statusRegister);
-            if (Bytes::TestBit<5>(regModeControl2))
+            if (isFrameIntEnabled)
             {
+                LogInterrupt("Requesting frame IRQ");
                 interrupt->RequestIrq();
             }
         }
